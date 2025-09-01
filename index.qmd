@@ -1,0 +1,33 @@
+---
+title: "Tyler's Analytics Site
+
+
+"
+---
+#### **Hello, my name is Tyler Lara.** 
+Born and raised in Queens, I have quite a few hobbies like photography, it really helps me get out and meet new people. 
+ 
+I am a **Baruch Graduate Student**, with an expected graduation at **may of 2027**. I am currently looking to get employed in the data science field.
+
+On this site, I have/will have multiple projects that represent my skill set for future employers.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+if(!require("leaflet")){
+    options(repos=c(CRAN="https://cloud.r-project.org"))
+    install.packages("leaflet")
+    stopifnot(require("leaflet"))
+}
+
+baruch_longitude <- -73.98333
+baruch_latitude  <- +40.75028
+
+leaflet() |>
+  addTiles() |>
+  setView(baruch_longitude, baruch_latitude, zoom=17) |>
+  addPopups(baruch_longitude, baruch_latitude, 
+            "I am a Master's student at <b>Baruch College</b>!")
+```
