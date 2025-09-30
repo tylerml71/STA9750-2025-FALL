@@ -4,16 +4,18 @@ project:
 
 website:
   title: "STA 9750 Submission Material"
-  description:
-    Course Projects for STA 9750 at Baruch College
+  description: "Course Projects for STA 9750 at Baruch College"
   site-url: "https://tylerml71.github.io/STA9750-2025-FALL/"
   navbar:
+    left:
+      - href: mp01.qmd
+        text: MP01
     background: primary
     search: false
-    
+
 format:
   html:
-    theme: vapor
+    theme: pulse
     toc: false
 
 editor:
