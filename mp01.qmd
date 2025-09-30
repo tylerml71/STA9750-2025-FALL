@@ -1,4 +1,4 @@
 ---
-title: "mp01"
+title: "Min-Project #01: Exploring the Most Popular Programming on Netflix"
 ---
 
