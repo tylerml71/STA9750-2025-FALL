@@ -151,7 +151,7 @@ cat(" - Number of 'N/A' or 'NA' strings before mutation:", na_string_count_befor
 cat(" - Number of NA values before mutation:", na_count_before, "\n")
 cat(" - Number of NA values after mutation:", na_count_after, "\n")
 ```
-Thankfully, it worked.
+The number of NA and N/A values being the same as the NA values after mutation is good. We can now move on to the next step.
 
 ### Initial Data Exploration
 
