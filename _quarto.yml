@@ -9,7 +9,7 @@ website:
   navbar:
     left:
       - href: mp01.qmd
-        text: MP01
+        text: "Mini-Project #01"
     background: primary
     search: false
 
