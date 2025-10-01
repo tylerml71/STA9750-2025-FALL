@@ -1,4 +1,163 @@
 ---
-title: "Min-Project #01: Exploring the Most Popular Programming on Netflix"
+title: "Foreign content: The way forward for Netflix?"
+format:
+  html:
+    theme: pulse
+    toc: true
+    toc-depth: 2
+    sections: true
+    css: custom.css
+    code-fold: true
+    code-summary: "Show the code"
+    code-tools:
+      toggle: true
+      source: true
+      caption: "code"
 ---
+<style>
+body {
+  font-family: 'Lato', sans-serif;
+}
+</style> 
+
+**New York, NY, September 30, 2025:** During this past decade, viewers have been showing more and more interest in both foreign and non-English films like the award-winning film *Parasite*, and the massively popular show *Squid Games* (both currently offered on Netflix). To keep up with this growing demand, Netflix has invested and expanded globally, partnering with companies and studios to add high-quality films and shows to its offerings.
+
+This week, *KPop Demon Hunters*, *Wayward*, *She said Maybe*, and *Billionaires' Bunker* are leading the top 10 on its' platform for English movies, English shows, non-English Movies and non-English Shows, respectively. Netflix continues to dominate the top 10 on its' platform this week as every #1 title is a Netflix Original. This leads to some further questions about Netflix and their performance between its English and non-English content. Even though all of these films and movies are at #1 in their category, how popular are they compared to each other? And is Netflix seeing non-English content outpacing English content in terms of growth and viewership?
+
+## Aquiring Data
+
+In order to answer these questions, we will use the language R to set up and analyze our findings. First, let's prepare the foundation to answer these important questions. There are two files we will use to analyse and find our answers, from [Netflix's TuDum Top 10](https://www.netflix.com/tudum/top10){style="color: red;"}. The two files are Global Top 10 and Country-wide Top 10, both important for finding popularity of films and shows on a large and smaller scale.
+
+```{r}
+#| echo: true
+#| include: true
+#| output: false
+
+# Create folder
+if (!dir.exists(file.path("data", "mp01"))) {
+  dir.create(file.path("data", "mp01"), showWarnings = FALSE, recursive = TRUE)
+}
+
+# Download global file
+global_file <- file.path("data", "mp01", "global_top10_alltime.csv")
+if (!file.exists(global_file)) {
+  download.file("https://www.netflix.com/tudum/top10/data/all-weeks-global.tsv",
+                destfile = global_file)
+}
+
+# Download country file
+country_file <- file.path("data", "mp01", "country_top10_alltime.csv")
+if (!file.exists(country_file)) {
+  download.file("https://www.netflix.com/tudum/top10/data/all-weeks-countries.tsv",
+                destfile = country_file)
+}
+```
+
+We will use multiple libraries to analyze as well, such as *tidyverse, knitr, and DT*.
+
+```{r}
+#| echo: true
+#| include: true
+#| output: false
+
+# Download libraries
+packages <- c("tidyverse", "knitr", "kableExtra", "DT")
+
+for (pkg in packages) {
+  if (!require(pkg, character.only = TRUE)) {
+    install.packages(pkg, repos = "https://cloud.r-project.org/")
+    library(pkg, character.only = TRUE)
+  }
+}
+
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(DT)
+
+```
+
+## Data Importing and Setup
+
+### Importing and Cleaning
+
+After downloading the files, and setting up the libraries, it's time to import these files and get a feeling of the data.
+
+```{r}
+#| echo: true
+#| results: hold
+#| include: true
+#| output: true
+# Read data files
+invisible(suppressMessages(GLOBAL_TOP_10 <- read_tsv(global_file)))
+
+
+#Describe the data, with four instances
+
+summary_tbl <- tibble(
+  Column = names(GLOBAL_TOP_10),
+  Type = sapply(GLOBAL_TOP_10, class),
+  Example = sapply(GLOBAL_TOP_10, function(x) toString(head(unique(x), 4)))
+)
+
+kable(summary_tbl, caption = "Global Top 10 Overview")
+
+cat("Number of columns:", nrow(GLOBAL_TOP_10), "\n\n")
+```
+
+Everything looks good at an initial glance. However, it's always important to make sure that the formatting within a data set is correct, or there can be issues. These missing values (commonly known as NA or Not Available) do not follow the formatting that R detects. There are multiple ways to clean and format data, such as
+<span class="custom-tooltip">mutating
+<span class="custom-tooltiptext">Adds or modifies columns in a data frame by computing new variables.</span>
+</span>
+a column within the data to replace variables (i.e. replacing N/A with NA). A column within the data to replace variables (i.e. replacing N/A with NA) or doing so when initially importing the file.
+
+
+```{r}
+#| echo: true
+#| include: true
+#| output: false
+
+# Count N/A and NA strings beforemutation
+na_string_count_before <- sum(GLOBAL_TOP_10$season_title %in% c("N/A", "NA"), na.rm = TRUE)
+na_count_before <- sum(is.na(GLOBAL_TOP_10$season_title))
+
+# Mutating the season_title column
+GLOBAL_TOP_10 <- GLOBAL_TOP_10 |>
+  mutate(season_title = if_else(
+    is.na(season_title)
+    | season_title == 'N/A',
+    NA_character_,
+    season_title
+  ))
+# Replacing ALL N/A with NA  
+
+COUNTRY_TOP_10 <- read_tsv(country_file, na = c("N/A", "NA"))
+
+
+```
+Now that we changed the data, lets quickly look if the NA values changed.
+```{r}
+#| echo: true
+#| results: hold
+#| include: true
+#| output: true
+
+
+# Count NAs after mutation
+na_count_after <- sum(is.na(GLOBAL_TOP_10$season_title))
+
+cat("In 'season_title' column:\n")
+cat(" - Number of 'N/A' or 'NA' strings before mutation:", na_string_count_before, "\n")
+cat(" - Number of NA values before mutation:", na_count_before, "\n")
+cat(" - Number of NA values after mutation:", na_count_after, "\n")
+```
+Thankfully, it worked.
+
+### Initial Data Exploration
+
+
+
+
+## Exploratory Analysis
+
 
