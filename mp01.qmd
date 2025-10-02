@@ -1,10 +1,11 @@
 ---
-title: "Foreign content: The way forward for Netflix?"
+title: "Netflix: Serving delicous cheeseburgers that brings fans back for more"
 format:
   html:
     theme: pulse
+    theme-accent: "#D81F26"
     toc: true
-    toc-depth: 2
+    toc-depth: 3
     sections: true
     css: custom.css
     code-fold: true
@@ -18,9 +19,9 @@ format:
 body {
   font-family: 'Lato', sans-serif;
 }
-</style> 
+</style>
 
-**New York, NY, September 30, 2025:** During this past decade, viewers have been showing more and more interest in both foreign and non-English films like the award-winning film *Parasite*, and the massively popular show *Squid Games* (both currently offered on Netflix). To keep up with this growing demand, Netflix has invested and expanded globally, partnering with companies and studios to add high-quality films and shows to its offerings.
+**New York, NY, September 30, 2025:** During this past decade, viewers have been showing more and more interest in both foreign and non-English films like the award-winning film *Parasite*, and the massively popular show *Squid Games* (both currently offered on Netflix). To keep up with this growing demand, Netflix has invested and expanded globally, partnering with companies and studios to add high-quality films and shows to its offerings. 
 
 This week, *KPop Demon Hunters*, *Wayward*, *She said Maybe*, and *Billionaires' Bunker* are leading the top 10 on its' platform for English movies, English shows, non-English Movies and non-English Shows, respectively. Netflix continues to dominate the top 10 on its' platform this week as every #1 title is a Netflix Original. This leads to some further questions about Netflix and their performance between its English and non-English content. Even though all of these films and movies are at #1 in their category, how popular are they compared to each other? And is Netflix seeing non-English content outpacing English content in terms of growth and viewership?
 
@@ -102,7 +103,7 @@ summary_tbl <- tibble(
 
 kable(summary_tbl, caption = "Global Top 10 Overview")
 
-cat("Number of columns:", nrow(GLOBAL_TOP_10), "\n\n")
+cat("Number of rows:", nrow(GLOBAL_TOP_10), "\n\n")
 ```
 
 Everything looks good at an initial glance. However, it's always important to make sure that the formatting within a data set is correct, or there can be issues. These missing values (commonly known as NA or Not Available) do not follow the formatting that R detects. There are multiple ways to clean and format data, such as
@@ -153,7 +154,69 @@ cat(" - Number of NA values after mutation:", na_count_after, "\n")
 ```
 The number of NA and N/A values being the same as the NA values after mutation is good. We can now move on to the next step.
 
+
+
 ### Initial Data Exploration
+
+#### Table View of data
+Lets look at a larger sample of the data, since there are 8,800 rows table:
+```{r}
+format_titles <- function(df){
+    colnames(df) <- str_replace_all(colnames(df), "_", " ") |> str_to_title()
+    df
+}
+
+GLOBAL_TOP_10 |> 
+  mutate(`runtime_(minutes)` = round(60 * runtime)) |>
+  select(-runtime) |>
+  format_titles() |>
+  slice_sample(n = 25) |> 
+  datatable(options = list(pageLength = 5,
+    lengthMenu = c(5, 10, 20, 25),
+    searching = FALSE, info = FALSE)) |>
+  formatRound(c('Weekly Hours Viewed', 'Weekly Views'))
+```
+
+
+```{r, include=FALSE}
+#question 1
+num_country <- COUNTRY_TOP_10 |>
+  summarize(n_distinct(country_name))
+
+top_non_eng_film <- GLOBAL_TOP_10 |>
+  filter(category == 'Films (Non-English)') |>
+  select(show_title, cumulative_weeks_in_top_10) |>
+  slice_max(cumulative_weeks_in_top_10, n = 1)
+
+#Question 2
+top_film_title <- top_non_eng_film$show_title[1]
+top_film_weeks <- top_non_eng_film$cumulative_weeks_in_top_10[1]
+
+#Question 6
+less_200 <- COUNTRY_TOP_10 |> group_by(country_name) |> summarise(total_weeks = n_distinct(week), .groups = "drop") |> filter(total_weeks < 200) 
+
+country_ceased <- less_200$country_name 
+
+#Number of weeks before operations stopped
+weeks_ceased <- less_200$total_weeks
+last_week <- COUNTRY_TOP_10 |> group_by(country_name) |> summarise(last_week = max(week), .groups = "drop") 
+ceased_info <- less_200 |> inner_join(last_week, by = "country_name") 
+cease_date <- format(ceased_info$last_week, "%B %d, %Y")
+```
+
+Clearly, the data varies a lot. After all, Netflix operates in **`r num_country[[1]]`** countries.[^num_countries] However, Netflix did cease its' operations in **`r country_ceased`** on `r cease_date`, only operating there for a total of **`r weeks_ceased`** weeks this year.[^cease_service]   Essentially, that means that 
+
+
+The top global non-English film is *`r top_film_title`*, which spent **`r top_film_weeks` weeks** in the top 10.[^top_film_weeks] 
+
+ 
+with the data spanning years, data including TV and Films, the specific season and whether they are English or non-English. Netflix after all, 
+Some further exploration is needed to understand this data.
+
+
+
+
+
 
 
 
@@ -161,3 +224,49 @@ The number of NA and N/A values being the same as the NA values after mutation i
 ## Exploratory Analysis
 
 
+
+
+
+
+
+[^num_countries]: 
+Code for total number of countries:  
+    ```{r}
+#Question 1
+num_country<- COUNTRY_TOP_10 |>
+  summarize(n_distinct(country_name))
+    ```
+
+[^top_film_weeks]:  
+Code for top global non-English film:
+    ``` {r}
+#| output: False
+# Question 2
+top_non_eng_film <- GLOBAL_TOP_10 |>
+  filter(category == 'Films (Non-English)') |>
+  select(show_title, cumulative_weeks_in_top_10) |>
+  slice_max(cumulative_weeks_in_top_10, n = 1)
+
+
+top_film_title <- top_non_eng_film$show_title[1]
+top_film_weeks <- top_non_eng_film$cumulative_weeks_in_top_10[1]
+
+    ```
+    
+[^cease_service]:  
+Code for which country Netlfix stopped service:
+    ``` {r}
+#Question 6
+less_200 <- COUNTRY_TOP_10 |> group_by(country_name) |> summarise(total_weeks = n_distinct(week), .groups = "drop") |> filter(total_weeks < 200) 
+    
+
+country_ceased <- less_200$country_name 
+weeks_ceased <- less_200$total_weeks
+
+last_week <- COUNTRY_TOP_10 |> group_by(country_name) |> summarise(last_week = max(week), .groups = "drop") 
+
+ceased_info <- less_200 |> inner_join(last_week, by = "country_name") 
+
+#Formatting
+cease_date <- format(ceased_info$last_week, "%B %d, %Y")
+    ```
