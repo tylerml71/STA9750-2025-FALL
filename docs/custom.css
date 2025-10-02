@@ -1,8 +1,108 @@
-.navbar, .quarto-title-block .navbar, .navbar.navbar-expand-lg.navbar-dark.bg-primary {
-  background-color: #D81F26 !important;
+/* Netflix-Red Theme Overrides for Quarto Pulse Theme */
+
+/* Set global CSS variables to Netflix red */
+:root {
+  --quarto-accent-color: #D81F26 !important;
+  --quarto-link-color: #D81F26 !important;
+  --quarto-link-hover-color: #B22222 !important;
+  --quarto-primary-color: #D81F26 !important;
+}
+
+/* Base link styles */
+a, a:visited {
+  color: #D81F26 !important;
+}
+
+/* General link hover/focus */
+a:hover,
+a:focus {
+  color: #B22222 !important;
+  background-color: transparent !important;
+  text-decoration: underline !important;
 }
 
 
+
+/* Navbar background and link colors */
+.navbar,
+.quarto-title-block .navbar,
+.navbar.navbar-expand-lg.navbar-dark.bg-primary {
+  background-color: #D81F26 !important;
+}
+
+.navbar a,
+.navbar .nav-link {
+  color: #FFFFFF !important;
+}
+
+.navbar a:hover,
+.navbar a:focus,
+.navbar .nav-link:hover,
+.navbar .nav-link:focus {
+  color: #FFD1D1 !important;
+  background-color: transparent !important;
+  text-decoration: underline !important;
+}
+
+/* TOC*/
+.quarto-toc a,
+.toc a {
+  color: #D81F26 !important;
+}
+
+
+.quarto-toc a:hover,
+.quarto-toc a:focus,
+.toc a:hover,
+.toc a:focus {
+  color: #B22222 !important;
+  background-color: transparent !important;
+  text-decoration: underline !important;
+}
+
+.sidebar nav[role="doc-toc"] a.nav-link.active {
+  color: #B22222 !important;
+  border-left: 2px solid #B22222 !important;
+  background-color: transparent !important;
+  font-weight: bold !important;
+}
+
+.sidebar .nav-link.active,
+.quarto-margin-sidebar .nav-link.active,
+.nav-link.active {
+  background-color: transparent !important;
+  color: #B22222 !important;
+  font-weight: bold !important;
+  border-left: none !important;
+}
+
+.sidebar .nav-link.active,
+.quarto-margin-sidebar .nav-link.active,
+.nav-link.active {
+  background-color: transparent !important;
+  color: #B22222 !important;
+  font-weight: bold !important;
+  border-left: 3px solid #B22222 !important;
+}
+/* Header anchors (e.g. § links) */
+.header-anchor:hover,
+.header-anchor:focus {
+  color: #D81F26 !important;
+}
+
+/* Accent borders or highlights */
+.border-accent,
+.highlight {
+  border-color: #D81F26 !important;
+  background-color: #f8d7da !important;
+}
+
+/* Focus outlines (e.g. when tabbing) */
+:focus {
+  outline-color: #D81F26 !important;
+}
+
+/* Tooltip styling */
 .custom-tooltip {
   position: relative;
   display: inline-block;
@@ -36,3 +136,56 @@
   opacity: 1;
 }
 
+/* Footnote tooltips display correctly */
+.footnotes .custom-tooltiptext {
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: static !important;
+  background-color: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+  width: auto !important;
+  border-radius: 0 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  bottom: auto !important;
+  left: auto !important;
+  z-index: auto !important;
+  transition: none !important;
+}
+
+/* Footnotes code block color */
+.footnotes pre,
+.footnotes code {
+  color: inherit !important;
+  background-color: #f8f9fa !important;
+}
+
+/* Index number style */
+.index-number {
+  color: #B22222 !important;
+  font-weight: bold;
+}
+
+.code-tools .btn,
+.code-tools .btn:hover,
+.code-tools .btn:focus,
+.code-tools .btn:active,
+.code-tools .btn-primary {
+  background-color: #f8f9fa !important;
+  border-color: #ced4da !important;
+  color: #212529 !important;
+  box-shadow: none !important;
+}
+
+
+.navbar-brand {
+  color: white !important;
+  font-weight: normal !important;
+}
+
+
+.navbar .nav-link.active {
+  color: white !important;
+  font-weight: normal !important;
+}
