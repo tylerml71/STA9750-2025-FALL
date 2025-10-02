@@ -23,7 +23,7 @@ if (!require("tidyverse"))
 install.packages("kableExtra")
 
 
-GLOBAL_TtidyverseGLOBAL_TOP_10 <- read_tsv(GLOBAL_TOP_10_FILENAME)
+GLOBAL_GLOBAL_TOP_10 <- read_tsv(GLOBAL_TOP_10_FILENAME)
 
 COUNTRY_TOP_10 <- read_tsv(COUNTRY_TOP_10_FILENAME, na = c("N/A", "NA"))
 
@@ -140,18 +140,14 @@ COUNTRY_TOP_10 |>
     week_diff = as.numeric(week - lag(week)),
     
     # New group whenever gap is not exactly 7 days (i.e., break in consecutive weeks)
-    group_id = cumsum(ifelse(is.na(week_diff) | week_diff != 7, 1, 0))
+    group_id = cumsum(ifelse(is.na(week_diff) |
+                               week_diff != 7, 1, 0))
   ) |>
   group_by(country_name, show_title, group_id) |>
-  summarise(
-    successive_weeks = n(),
-    .groups = "drop"
-  ) |>
+  summarise(successive_weeks = n(), .groups = "drop") |>
   group_by(country_name, show_title) |>
-  summarise(
-    longest_successive_run = max(successive_weeks),
-    .groups = "drop"
-  ) |>
+  summarise(longest_successive_run = max(successive_weeks),
+            .groups = "drop") |>
   slice_max(longest_successive_run) |>
   rename(
     `Country` = country_name,
@@ -176,7 +172,7 @@ last_week <- COUNTRY_TOP_10 |>
   summarise(last_week = max(week), .groups = "drop")
 
 less_200 |>
-  inner_join(last_weeks, by = "country_name")|>
+  inner_join(last_week, by = "country_name")|>
   mutate(last_week = format(last_week, "%B %d, %Y")) |>
   rename(
     `Country` = country_name,
@@ -209,7 +205,7 @@ GLOBAL_TOP_10 |>
 ##What is the most recent film to pull this off?
 
 COUNTRY_FIRST <- COUNTRY_TOP_10 |>
-  filter(category== 'Films', country_iso2 == "US",)|>
+  filter(category == 'Films', country_iso2 == "US", )|>
   group_by(show_title) |>
   mutate(ever_1st = any(weekly_rank == 1)) |>
   ungroup()
@@ -224,7 +220,7 @@ COUNTRY_FIRST |>
     .groups = "drop"
   ) |>
   filter(debut_rank > 1) |>
-  summarize(`Number of films reaching #1 later on`=n_distinct(show_title))|>
+  summarize(`Number of films reaching #1 later on` = n_distinct(show_title))|>
   kable()
 
 COUNTRY_FIRST |>
@@ -251,12 +247,14 @@ COUNTRY_TOP_10|>
     debut_week = first(week),
     debut_rank = first(weekly_rank),
     num_of_countries = n_distinct(country_iso2[week == first(week)]),
-    .groups="drop")|>
+    .groups = "drop"
+  )|>
   slice_max(num_of_countries)|>
-  rename(`Show`= show_title, `Season`=season_title, 
-         `Week Debuted`= debut_week, 
-         `Initial Rank`= debut_rank, 
-         `Number of Countries`= num_of_countries)|>
+  rename(
+    `Show` = show_title,
+    `Season` = season_title,
+    `Week Debuted` = debut_week,
+    `Initial Rank` = debut_rank,
+    `Number of Countries` = num_of_countries
+  )|>
   kable(caption = "TV shows hitting top 10 in the most Countries")
-
-
