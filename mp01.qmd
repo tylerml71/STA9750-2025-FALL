@@ -468,7 +468,7 @@ kpop_first2 <- COUNTRY_TOP_10 |>
 #| fig-width: 8
 #| fig-height: 5
 #| fig-align: center
-
+#| echo: true
 
 #Stranger things show comparison
 compare_shows <- c(
@@ -508,7 +508,6 @@ stranger_things <- GLOBAL_TOP_10|>
 stranger_things <- GLOBAL_TOP_10|>
   filter(show_title == "Stranger Things")|>
   mutate(season_title = ifelse(is.na(season_title), "Stranger Things 1", season_title))
-
 
 ggplot(
   stranger_things,
