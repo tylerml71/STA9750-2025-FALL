@@ -16,6 +16,9 @@ format:
       toggle: true
       source: true
       caption: "code"
+    self-contained: true  
+      
+      
 website:
   output-dir: docs 
 ---
