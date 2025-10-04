@@ -16,6 +16,8 @@ format:
       toggle: true
       source: true
       caption: "code"
+website:
+  output-dir: docs 
 ---
 <style>
 body {
