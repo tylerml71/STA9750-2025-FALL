@@ -16,7 +16,7 @@ format:
       toggle: true
       source: true
       caption: "code"
-    self-contained: fals  
+    self-contained: false  
       
 website:
   output-dir: docs 
