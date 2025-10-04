@@ -1,4 +1,4 @@
-/* Netflix-Red Theme Overrides for Quarto Pulse Theme */
+
 
 /* Set global CSS variables to Netflix red */
 :root {
@@ -188,4 +188,12 @@ a:focus {
 .navbar .nav-link.active {
   color: white !important;
   font-weight: normal !important;
+}
+
+
+.sidebar nav[role="doc-toc"] a.nav-link:not(.active):hover,
+.quarto-margin-sidebar a.nav-link:not(.active):hover {
+    color: #B22222 !important;  /* Netflix dark red */
+    background-color: transparent !important;
+    text-decoration: underline !important;
 }
