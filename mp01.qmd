@@ -468,7 +468,7 @@ kpop_first2 <- COUNTRY_TOP_10 |>
 #| fig-width: 8
 #| fig-height: 5
 #| fig-align: center
-#| echo: true
+#| dev: png
 
 #Stranger things show comparison
 compare_shows <- c(
@@ -606,7 +606,7 @@ INDIA_TOP10 |>
 #| fig-width: 8
 #| fig-height: 5
 #| fig-align: center 
-
+#| dev: png
 GLOBAL_TOP_10 |>
   filter(show_title == "KPop Demon Hunters") |>
   ggplot(aes(x = week, y = weekly_views)) +
