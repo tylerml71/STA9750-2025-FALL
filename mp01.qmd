@@ -5,8 +5,10 @@ format:
     theme: pulse
     theme-accent: "#D81F26"
     toc: true
-    toc-depth: 4
+    toc-depth: 3
+    toc-location: left
     sections: true
+    toc-floating: true
     css: custom.css
     code-fold: true
     code-summary: "Show the code"
@@ -458,6 +460,10 @@ kpop_first2 <- COUNTRY_TOP_10 |>
 #| echo: true
 #| results: hold
 #| output: true
+#| fig-width: 8
+#| fig-height: 5
+#| fig-align: center
+
 
 #Stranger things show comparison
 compare_shows <- c(
@@ -517,6 +523,11 @@ ggplot(
     color = "Season",
     linetype = "Season"
   ) +
+    scale_x_date(
+    date_breaks = "2 weeks",              
+    date_labels = "%b %d",               
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
   scale_color_manual(
     values = c(
       "Stranger Things 1" = "#E50914",
@@ -533,7 +544,12 @@ ggplot(
       "Stranger Things 4" = "solid"
     )
   ) +
-  theme_classic()
+  theme_classic() +
+theme(
+  axis.text.x = element_text(angle = 45, hjust = 1),
+  axis.title = element_text(face = "bold"),
+  legend.position = "bottom"
+)
 
 
 
@@ -583,6 +599,9 @@ INDIA_TOP10 |>
 
 
 ```{r}
+#| fig-width: 7
+#| fig-height: 5
+#| fig-align: center
 GLOBAL_TOP_10 |>
   filter(show_title == "KPop Demon Hunters") |>
   ggplot(aes(x = week, y = weekly_views)) +
@@ -600,7 +619,7 @@ GLOBAL_TOP_10 |>
     x = "Week",
     y = "Weekly Views"
   ) +
-  theme_minimal(base_size = 14) +
+  theme_minimal(base_size = 12) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     panel.grid.minor = element_blank()
