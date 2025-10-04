@@ -5,7 +5,7 @@ format:
     theme: pulse
     theme-accent: "#D81F26"
     toc: true
-    toc-depth: 3
+    toc-depth: 4
     sections: true
     css: custom.css
     code-fold: true
@@ -20,14 +20,18 @@ body {
   font-family: 'Lato', sans-serif;
 }
 </style>
+<div style="text-align: center;">
+  <img src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fstatic1.srcdn.com%2Fwordpress%2Fwp-content%2Fuploads%2F2023%2F10%2Fnetflix-logo-movies-tv-shows.jpg&f=1&nofb=1&ipt=078c796dd4a5c1799b88cbb7d6c4e3e93e994495292d99e767968c394d49f336" width="100%">
+</div>
+## Exploring the Most Popular Programming on Netflix
 
-**New York, NY, September 30, 2025:** During this past decade, viewers have been showing more and more interest in both foreign and non-English films like the award-winning film *Parasite*, and the massively popular show *Squid Games* (both currently offered on Netflix). To keep up with this growing demand, Netflix has invested and expanded globally, partnering with companies and studios to add high-quality films and shows to its offerings. 
+**New York, NY, September 28, 2025:** During this past decade, viewers have been showing more and more interest in both foreign and non-English films like the award-winning film *Parasite*, and the massively popular show *Squid Games* (both currently offered on Netflix). To keep up with this growing demand, Netflix has invested and expanded globally, partnering with companies and studios to add high-quality films and shows to its offerings. 
 
-This week, *KPop Demon Hunters*, *Wayward*, *She said Maybe*, and *Billionaires' Bunker* are leading the top 10 on its' platform for English movies, English shows, non-English Movies and non-English Shows, respectively. Netflix continues to dominate the top 10 on its' platform this week as every #1 title is a Netflix Original. This leads to some further questions about Netflix and their performance between its English and non-English content. Even though all of these films and movies are at #1 in their category, how popular are they compared to each other? And is Netflix seeing non-English content outpacing English content in terms of growth and viewership?
+This week, *Kpop Demon Hunters*, *Wayward*, *She Said Maybe*, and *Billionaires' Bunker* are leading the top 10 on its platform for English movies, English shows, non-English movies and non-English shows, respectively. Netflix continues to dominate the top 10 on its' platform this week as every #1 title is a Netflix Original. This leads to some further questions about Netflix and their performance between its English and non-English content. Is Netflix seeing non-English content outpacing English content in terms of growth and viewership?
 
 ## Aquiring Data
 
-In order to answer these questions, we will use the language R to set up and analyze our findings. First, let's prepare the foundation to answer these important questions. There are two files we will use to analyse and find our answers, from [Netflix's TuDum Top 10](https://www.netflix.com/tudum/top10){style="color: red;"}. The two files are Global Top 10 and Country-wide Top 10, both important for finding popularity of films and shows on a large and smaller scale.
+In order to answer these questions, we will use the language R to set up and analyze our findings. First, let's prepare the foundation to answer these important questions. There are two files we will use to analyse and find our answers, from [Netflix's TuDum Top 10](https://www.netflix.com/tudum/top10){style="color: red;"}. The two files are Global Top 10 and Country-wide Top 10, both important for finding popularity of films and shows on a large and smaller scale. We will also use multiple libraries to analyze as well, such as *tidyverse*, *knitr*, and *DT*.
 
 ```{r}
 #| echo: true
@@ -52,14 +56,6 @@ if (!file.exists(country_file)) {
   download.file("https://www.netflix.com/tudum/top10/data/all-weeks-countries.tsv",
                 destfile = country_file)
 }
-```
-
-We will use multiple libraries to analyze as well, such as *tidyverse, knitr, and DT*.
-
-```{r}
-#| echo: true
-#| include: true
-#| output: false
 
 # Download libraries
 packages <- c("tidyverse", "knitr", "kableExtra", "DT")
@@ -75,14 +71,15 @@ library(tidyverse)
 library(knitr)
 library(kableExtra)
 library(DT)
-
+library(scales)
+library(ggplot2)
 ```
 
 ## Data Importing and Setup
 
 ### Importing and Cleaning
 
-After downloading the files, and setting up the libraries, it's time to import these files and get a feeling of the data.
+After downloading the files, and setting up the libraries, its time to import these files and get a feeling of the data.
 
 ```{r}
 #| echo: true
@@ -106,11 +103,13 @@ kable(summary_tbl, caption = "Global Top 10 Overview")
 cat("Number of rows:", nrow(GLOBAL_TOP_10), "\n\n")
 ```
 
-Everything looks good at an initial glance. However, it's always important to make sure that the formatting within a data set is correct, or there can be issues. These missing values (commonly known as NA or Not Available) do not follow the formatting that R detects. There are multiple ways to clean and format data, such as
+Everything looks good at an initial glance. However, it's always important to make sure that the formatting within a data set is correct, or there can be issues. These missing values (commonly known as NA or Not Available) do not follow the formatting that R detects.
+</span>
+We can replace "N/A" or "NA" strings with proper NA values either by
 <span class="custom-tooltip">mutating
 <span class="custom-tooltiptext">Adds or modifies columns in a data frame by computing new variables.</span>
 </span>
-a column within the data to replace variables (i.e. replacing N/A with NA). A column within the data to replace variables (i.e. replacing N/A with NA) or doing so when initially importing the file.
+the column after import or specifying them when reading the file.
 
 
 ```{r}
@@ -118,7 +117,7 @@ a column within the data to replace variables (i.e. replacing N/A with NA). A co
 #| include: true
 #| output: false
 
-# Count N/A and NA strings beforemutation
+# Count N/A and NA strings before mutation
 na_string_count_before <- sum(GLOBAL_TOP_10$season_title %in% c("N/A", "NA"), na.rm = TRUE)
 na_count_before <- sum(is.na(GLOBAL_TOP_10$season_title))
 
@@ -152,14 +151,13 @@ cat(" - Number of 'N/A' or 'NA' strings before mutation:", na_string_count_befor
 cat(" - Number of NA values before mutation:", na_count_before, "\n")
 cat(" - Number of NA values after mutation:", na_count_after, "\n")
 ```
-The number of NA and N/A values being the same as the NA values after mutation is good. We can now move on to the next step.
+After mutation, the column now uses the proper NA values. This ensures that during future analyses we can handle the missing data correctly.
 
 
 
-### Initial Data Exploration
+## Initial Data Exploration
 
-#### Table View of data
-Lets look at a larger sample of the data, since there are 8,800 rows table:
+Lets look at a larger sample of the data, since there are 8,800 rows:
 ```{r}
 format_titles <- function(df){
     colnames(df) <- str_replace_all(colnames(df), "_", " ") |> str_to_title()
@@ -176,54 +174,439 @@ GLOBAL_TOP_10 |>
     searching = FALSE, info = FALSE)) |>
   formatRound(c('Weekly Hours Viewed', 'Weekly Views'))
 ```
+While it is nice to see what the table looks like, there are not many insights about Netflix's Top 10 lists that are available from only looking at 25 random entries. Lets take a closer look. 
 
+### Data Report
 
 ```{r, include=FALSE}
 #question 1
 num_country <- COUNTRY_TOP_10 |>
   summarize(n_distinct(country_name))
-
+#Question 2
 top_non_eng_film <- GLOBAL_TOP_10 |>
   filter(category == 'Films (Non-English)') |>
   select(show_title, cumulative_weeks_in_top_10) |>
   slice_max(cumulative_weeks_in_top_10, n = 1)
 
-#Question 2
 top_film_title <- top_non_eng_film$show_title[1]
 top_film_weeks <- top_non_eng_film$cumulative_weeks_in_top_10[1]
 
+#Question 3
+longest_film <- GLOBAL_TOP_10 |>
+  filter(category == 'Films (Non-English)' |
+           category == 'Films (English)') |>
+  mutate(`Runtime (minutes)` = round(60 * runtime)) |>
+  select(`Film` = show_title, `Runtime (minutes)`) |>
+  distinct() |>
+  slice_max(`Runtime (minutes)`)
+
+longest_film_name <- longest_film$`Film`
+longest_film_min <- longest_film$`Runtime (minutes)`
+
+
 #Question 6
 less_200 <- COUNTRY_TOP_10 |> group_by(country_name) |> summarise(total_weeks = n_distinct(week), .groups = "drop") |> filter(total_weeks < 200) 
+    
 
 country_ceased <- less_200$country_name 
-
-#Number of weeks before operations stopped
 weeks_ceased <- less_200$total_weeks
+
 last_week <- COUNTRY_TOP_10 |> group_by(country_name) |> summarise(last_week = max(week), .groups = "drop") 
+
 ceased_info <- less_200 |> inner_join(last_week, by = "country_name") 
 cease_date <- format(ceased_info$last_week, "%B %d, %Y")
+
+# Question 7
+squid_game_views <- GLOBAL_TOP_10 |>
+  filter(show_title == 'Squid Game') |>
+  group_by(show_title) |>
+  summarize(total_views = sum(weekly_views, na.rm = TRUE)) |>
+  pull(total_views)|>
+  scales::comma()
+
+#Question 8
+red_notice_views_2021 <- GLOBAL_TOP_10 |>
+  filter(show_title == 'Red Notice', lubridate::year(week) == 2021) |>
+  summarize(total_views = sum(weekly_hours_viewed, na.rm = TRUE) / 1.97) |>
+  pull(total_views)|>
+  scales::comma()
+
+#Question 9
+COUNTRY_FIRST <- COUNTRY_TOP_10 |>
+  filter(category == 'Films', country_iso2 == "US") |>
+  group_by(show_title) |>
+  mutate(ever_1st = any(weekly_rank == 1)) |>
+  ungroup()
+
+num_late_risers <- COUNTRY_FIRST |>
+  filter(ever_1st) |>
+  group_by(show_title) |>
+  arrange(week) |>
+  summarize(debut_rank = first(weekly_rank), .groups = "drop") |>
+  filter(debut_rank > 1) |>
+  nrow()
+
+recent_late_riser <- COUNTRY_FIRST |>
+  filter(ever_1st) |>
+  group_by(show_title) |>
+  arrange(week) |>
+  mutate(first_week_1st = min(week[weekly_rank == 1])) |>
+  summarize(
+    debut_week = first(week),
+    debut_rank = first(weekly_rank),
+    week_reached_1st = first(first_week_1st),
+    .groups = "drop"
+  ) |>
+  filter(debut_rank > 1) |>
+  slice_max(debut_week, n = 1) |>
+  pull(show_title)
+
+#Question 10
+debut_info <- COUNTRY_TOP_10 |>
+  filter(category == 'TV') |>
+  group_by(show_title, season_title)|>
+  arrange(week, .by_group = TRUE) |>
+  summarize(
+    debut_week = first(week),
+    debut_rank = first(weekly_rank),
+    num_of_countries = n_distinct(country_iso2[week == first(week)]),
+    .groups = "drop"
+  )|>
+  slice_max(num_of_countries)
+
+most_countries <- debut_info$num_of_countries
+most_countries_title <- debut_info$show_title
+most_countries_season <- debut_info$season_title
+
 ```
 
-Clearly, the data varies a lot. After all, Netflix operates in **`r num_country[[1]]`** countries.[^num_countries] However, Netflix did cease its' operations in **`r country_ceased`** on `r cease_date`, only operating there for a total of **`r weeks_ceased`** weeks this year.[^cease_service]   Essentially, that means that 
+After looking into and analyzing the data, one thing is clear: Netflix has a massive variety of shows and movies, and these are just the ones that have hit the top 10. Currently, it operates in **`r num_country[[1]]`** different countries.[^num_countries] However, the streaming platform did cease its operations in **`r country_ceased`**, exiting the market on `r cease_date`, for a total of only **`r weeks_ceased`** weeks this year.[^cease_service]
+
+Despite this, global content is still proving to be very successful. For example, the top global non-English film is *`r top_film_title`*, an anti-war film set in World War 1. It spent a total of **`r top_film_weeks` weeks** in the top 10, or equivalent to almost half a year.[^top_film_weeks] And its  not the only global sensation; many other films have been incredibly successful like the Korean survival drama *Squid Game*. It has achieved a total of **`r squid_game_views`** views across its three seasons globally.[^squid_game_views] But which film is the longest? Well, *`r longest_film_name `* is the clear winner, with an impressive `r longest_film_min` minute run time. [^longest_film] The strength of Netflix's foreign content doesn't end there, surprisingly. The show *Pablo Escobar, el patrón del mal* has 102 successive weeks being in the top 10. Not only does the show has the longest successive run in the top 10, but this achievement is split between **five** different Latin American countries (shown below). The show *Pablo Escobar, el patrón del mal* shows how quality serialized content can sustain attention and create strong audience loyalty.
+```{r}
+#| echo: false
+#| output: true
+#Question 5(hidden)
+COUNTRY_TOP_10 |>
+  filter(category == 'TV') |>
+  arrange(country_name, show_title, week) |>
+  group_by(country_name, show_title) |>
+  mutate(
+    week_diff = as.numeric(week - lag(week)),
+    group_id = cumsum(ifelse(is.na(week_diff) | week_diff != 7, 1, 0))
+  ) |>
+  group_by(country_name, show_title, group_id) |>
+  summarise(successive_weeks = n(), .groups = "drop") |>
+  group_by(country_name, show_title) |>
+  summarise(longest_successive_run = max(successive_weeks), .groups = "drop") |>
+  slice_max(longest_successive_run) |>
+  rename(
+    `Country` = country_name,
+    `Title` = show_title,
+    `Longest Successive Run (Weeks)` = longest_successive_run
+  ) |>
+  kable("html", caption = "What TV show had the longest uninterrupted weekly run in the top 10?") |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+
+```
+```{r}
+#| echo: true
+#| eval: false
+
+# Question 5, Code to calculate longest uninterrupted weekly run in the top 10
+COUNTRY_TOP_10 |>
+  filter(category == 'TV') |>
+  arrange(country_name, show_title, week) |>
+  group_by(country_name, show_title) |>
+  mutate(
+    week_diff = as.numeric(week - lag(week)),
+    group_id = cumsum(ifelse(is.na(week_diff) | week_diff != 7, 1, 0))
+  ) |>
+  group_by(country_name, show_title, group_id) |>
+  summarise(successive_weeks = n(), .groups = "drop") |>
+  group_by(country_name, show_title) |>
+  summarise(longest_successive_run = max(successive_weeks), .groups = "drop") |>
+  slice_max(longest_successive_run) |>
+  rename(
+    `Country` = country_name,
+    `Title` = show_title,
+    `Longest Successive Run (Weeks)` = longest_successive_run
+  ) |>
+  kable("html", caption = "What TV show had the longest uninterrupted weekly run in the top 10?") |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+
+```
+Now lets put some focus on English and US content. *`r most_countries_title`* is the show with the widest appeal country-wise, debuting in the top 10 for `r most_countries` different countries.[^top_10_most_countries] Many fans across the globe were eagerly waiting for the release of *`r most_countries_season`*, and it definitely shows. Popularity of English language shows doesn't end there, with the comedy hit *Red Notice* reaching **`r red_notice_views_2021`** views in 2021 alone.[^red_notice_views] Interestingly, some films weren't an immediate hit but instead gained momentum over time. A total of **`r num_late_risers`** films reached the #1 spot after debuting at a lower rank on the weekly chart.[^late_risers] The most recent film to do this was *`r recent_late_riser`*, giving one more example how sometimes films need time to build their audiences even if their program wasn't an initial smash hit.
+
+Finally, lets answer the question: which content has been viewed the most on Netflix’s streaming platform? Looking below, *Squid Game*, a TV and non-English show, is the clear victor. It beats Stranger Things by over 2 billion total hours watched, and makes Films' viewership look tiny with those only being in the hundreds of millions. However, it is important to note that TV shows have multiple episodes, often being an hour long or more. Because of this, it takes more hours to finish a TV show compared to films and will have heavily inflated numbers. English content still does have an upper hand on the film side, with *KPop Demon Hunters* having almost double the hours watched of *Society of the snow*. 
+```{r}
+#| echo: false
+#| output: true
+
+GLOBAL_TOP_10 |>
+  select(category, show_title, weekly_hours_viewed) |>
+  group_by(category, show_title) |>
+  summarise(`Total hours watched` = sum(weekly_hours_viewed),
+            .groups = "drop_last")|>
+  slice_max(`Total hours watched`) |>
+  ungroup()|>
+  mutate(`Total hours watched` = comma(`Total hours watched`)) |>
+  rename(`Category` = category, `Title` = show_title)|>
+  kable()
+```
+```{r}
+#| echo: true
+#| eval: false
+#| output: false
+
+#Question 4 (hidden)
+GLOBAL_TOP_10 |>
+  select(category, show_title, weekly_hours_viewed) |>
+  group_by(category, show_title) |>
+  summarise(`Total hours watched` = sum(weekly_hours_viewed),
+            .groups = "drop_last")|>
+  slice_max(`Total hours watched`) |>
+  ungroup()|>
+  mutate(`Total hours watched` = comma(`Total hours watched`)) |>
+  rename(`Category` = category, `Title` = show_title)|>
+  kable()
+```
 
 
-The top global non-English film is *`r top_film_title`*, which spent **`r top_film_weeks` weeks** in the top 10.[^top_film_weeks] 
-
- 
-with the data spanning years, data including TV and Films, the specific season and whether they are English or non-English. Netflix after all, 
-Some further exploration is needed to understand this data.
-
-
-
-
-
-
+```{r, include=FALSE}
+#Stranger Things total hours viewed
+stranger_hours <- GLOBAL_TOP_10 |>
+  filter(show_title == "Stranger Things") |>
+  group_by(show_title) |>
+  summarize(total_hours = sum(weekly_hours_viewed)) |>
+  pull(total_hours)
+  
+si_formatter <- label_number(scale_cut = cut_short_scale(), accuracy = 0.01)
 
 
+stranger_hours_f <- paste0(sub("([KMB])$", " \\1", si_formatter(stranger_hours)))
+stranger_hours_f
 
-## Exploratory Analysis
+
+#Filter out India
+INDIA_TOP10 <- COUNTRY_TOP_10 |>
+  filter(country_iso2 == "IN")|>
+  mutate(year = year(week))
+
+#Number of unique indian shows
+num_in_shows_1 <- INDIA_TOP10 |>
+  group_by(show_title) |>
+  summarize(max_rank = min(weekly_rank), .groups = "drop") |>
+  filter(max_rank == 1) |>
+  nrow()
+
+#
+india_avg_rank <- INDIA_TOP10 |>
+  group_by(show_title) |>
+  summarize(
+    total_weeks = n_distinct(week),
+    avg_rank = mean(weekly_rank, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  filter(total_weeks >= 5) |>   
+  arrange(avg_rank)           
+
+top_india_show <- india_avg_rank$show_title[1]
+top_india_avg_rank <- india_avg_rank$avg_rank[1]
+
+top_india_show
+top_india_avg_rank
+
+#Kpop Demon Hunters Consecutive Streak
+kpop_global_streak <- GLOBAL_TOP_10 |>
+  filter(show_title == "KPop Demon Hunters") |>
+  arrange(week) |>
+  mutate(top2 = weekly_rank <= 2)
 
 
+streaks <- rle(kpop_global_streak$top2)
+max_top2_streak <- if(any(streaks$values)) max(streaks$lengths[streaks$values]) else 0
+
+
+# Total weeks ever in top 1
+num_1_kpop_amount<-GLOBAL_TOP_10 |>
+  filter(show_title == "KPop Demon Hunters") |>
+  summarize(sum(weekly_rank == 1)
+  )
+
+
+#Where Kpop first released at 1st Place within the first 2 weeks
+kpop_first2 <- COUNTRY_TOP_10 |>
+  filter(show_title == "KPop Demon Hunters") |>
+  group_by(country_name) |>
+  arrange(week) |>
+  mutate(week_number = row_number()) |>
+  filter(week_number <= 2, weekly_rank == 1) |>
+  ungroup() |>
+  summarize(num_countries_first3_1 = n_distinct(country_name))
+
+
+```
+
+## Press Release 1
+<div style="text-align: center;">
+  <img src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.whats-on-netflix.com%2Fwp-content%2Fuploads%2F2025%2F07%2Fstranger-things-season-5-trailer-drops.jpg&f=1&nofb=1&ipt=fe9f18f036fea20023f7b5a1e8d9bb6f122a68b22b18abfcc51547a1ee000c2c" width="100%">
+</div>
+### Stranger Things: Dominating the past and the future as Season 5 Approaches
+**New York, NY, October 1st, 2025:** The show *Stranger Things* has been one of Netflix's most popular shows worldwide, consistently ranking among Netflix's most watched shows since its introduction in 2016. Across its first four seasons, the series has achieved a total of **`r stranger_hours_f`illion** hours watched, with fans clamoring for season five its sure to rise even more.[^stranger_hours] *Stranger Things* also spent almost half a year in the top 10 in 2022(as shown below), and has had clear global success with season 4. It even sparked newcomers to join in on the release of season 4, with seasons 1, 2, and 3 all reaching the top 10 at the same time as season 4 for three months. Overall, *Stranger Things* has such a strong presence and viewership, beating *Wednesday*, *Bridgerton*, and *Inventing Anna*. Its average rank is 4.44, but including all seasons of Stranger Things lowers this value, since earlier seasons are counted again when they re-enter the top 10. The highly anticipated fifth Season of *Stranger Things* will release four episodes on November 26th, three episodes on December 25th, and a finale episode on January 31st. 
+```{r}
+#| echo: true
+#| results: hold
+#| output: true
+
+#Stranger things show comparison
+compare_shows <- c(
+  "Wednesday",
+  "Bridgerton",
+  "Inventing Anna",
+  "Stranger Things"
+)
+
+GLOBAL_TOP_10 |>
+  filter(show_title %in% compare_shows | show_title == "Stranger Things") |>
+  group_by(show_title) |>
+  arrange(week, .by_group = TRUE) |>
+  summarize(
+    total_hours = sum(weekly_hours_viewed, na.rm = TRUE),
+    total_weeks = n_distinct(week),
+    average_rank = round(mean(weekly_rank, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) |>
+  arrange(desc(total_hours)) |>
+  mutate(total_hours = scales::comma(total_hours, accuracy = 1)) |>
+  rename(
+    Show = show_title,
+    `Total Hours Viewed` = total_hours,
+    `Weeks in Top 10` = total_weeks,
+    `Average Rank` = average_rank
+  ) |>
+  kable("html", caption = "Comparison of Top Netflix Shows") |>
+  kable_styling(bootstrap_options = c("striped","hover","condensed","responsive"), full_width = F) |>
+  column_spec(1, border_right = TRUE, width = "10em") |>
+  column_spec(2:4, width = "8em", bold = FALSE, extra_css = "text-align:center;")
+stranger_things <- GLOBAL_TOP_10|>
+  filter(show_title == "Stranger Things")|>
+  mutate(season_title = ifelse(is.na(season_title), "Stranger Things 1", season_title))
+
+# Stranger things Ranking over time
+stranger_things <- GLOBAL_TOP_10|>
+  filter(show_title == "Stranger Things")|>
+  mutate(season_title = ifelse(is.na(season_title), "Stranger Things 1", season_title))
+
+
+ggplot(
+  stranger_things,
+  aes(
+    x = week,
+    y = weekly_rank,
+    color = season_title,
+    linetype = season_title
+  )
+) +
+  geom_line(linewidth = 1.2) +
+  scale_y_reverse(breaks = 1:10) +
+  labs(
+    title = "Stranger Things Season Rankings in 2022",
+    x = "Month",
+    y = "Weekly Rank in Top 10",
+    color = "Season",
+    linetype = "Season"
+  ) +
+  scale_color_manual(
+    values = c(
+      "Stranger Things 1" = "#E50914",
+      "Stranger Things 2" = "#000000",
+      "Stranger Things 3" = "#B81D24",
+      "Stranger Things 4" = "#FF3A3A"
+    )
+  ) +
+  scale_linetype_manual(
+    values = c(
+      "Stranger Things 1" = "solid",
+      "Stranger Things 2" = "dashed",
+      "Stranger Things 3" = "dashed",
+      "Stranger Things 4" = "solid"
+    )
+  ) +
+  theme_classic()
+
+
+
+```
+
+
+## Press Release 2
+<div style="text-align: center;">
+  <img src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ff.i.uol.com.br%2Ffotografia%2F2022%2F08%2F08%2F165999501162f18383cbd54_1659995011_3x2_rt.jpg&f=1&nofb=1&ipt=c3d4ae537ce1722f1674fdbc920199d2f97c1651dfed6b1eb96a23054dc01c90" width="100%">
+</div>
+
+### India's Appetite for Hindi Content on Netflix Soars as Hindi Films Dominate the Top 10
+**New Delhi, India, October 2nd, 2025:** Netflix continues to further its expansion throughout India, gaining audiences through both foreign and local Hindi-language films. In 2025, the three films with the longest stay in the Indian Top 10 are all produced in India. Each shows' stay is impressive, as *RRR* spent 325 weeks, *Haseen Dillruba* spent 231 weeks, and *Sooryavanshi* spent 210 weeks. These films highlight India's enjoyment for local content, and presents a clear opportunity for Netflix to further grow its Indian audience if it expands its local offerings. So far, `r num_in_shows_1` unique shows have reached the #1 spot, further demonstrating Indian audiences' Enjoyment of Hindi content.[^In_unique] Out of these unique films on the streaming platform, the content *`r top_india_show`* stood out with the highest average ranking of `r round(top_india_avg_rank, digits=2)`, showing how much viewers enjoyed this Hindi show. Overall, these trends and the massive success of Hindi content are suggests Netflix has the clear opportunity to expand in India.  
+
+```{r}
+INDIA_TOP10 |>
+  filter(category == "Films") |>
+  group_by(show_title) |>
+  summarize(
+    total_weeks_in_top10 = sum(cumulative_weeks_in_top_10, na.rm = TRUE),
+    average_rank = round(mean(weekly_rank, na.rm = TRUE), 2), 
+    Highest_rank_achieved = min(weekly_rank, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  arrange(desc(total_weeks_in_top10)) |>
+  slice_head(n = 3)|>
+  format_titles()|>
+  kable("html", caption = "Films with the longest stay in Top 10") |>
+  kable_styling(
+    bootstrap_options = c("striped","hover","condensed","responsive"),
+    full_width = F
+  )
+```
+
+## Press Release 3
+<div style="text-align: center;">
+  <img src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fntvb.tmsimg.com%2Fassets%2Fp30322828_v_h10_aa.jpg%3Fw%3D960%26h%3D540&f=1&nofb=1&ipt=35d4cdeb0ed7331fa1388997ee8b0a1cfb55feccff4583cbf144fd5889190991" width="100%">
+</div>
+
+## Demon Slaying and Record Breaking: KPop Demon Hunters Dominates Globally
+**New York, NY, October 3rd, 2025:** *KPop Demon Hunters* is currently one of the biggest films of 2025, drawing in massive audiences from around the world. Ever since it released, the movie has remained in the Netflix Top 10 for `r streaks` weeks consecutively in the top 2, and has been in the #1 spot for `r num_1_kpop_amount ` globally.[^kpop_consecutive] Country-wise, Netflix's *KPop Demon Hunters* reached #1 in `r kpop_first2` different countries within its first two weeks.[^kpop_first2]
+  
+  Globally, the movie's trajectory is looking to stay very strong throughout this year. After its June debut, *KPop Demon Hunters* started strong, surging  to nearly 25 million weekly views by the end of its first week. From July to August, views steadily increased to over 25 million views each passing week. Views spiked again at the end of August, pushing the film to **35 million** views before tapering off in September. 
+  
+  Even though viewership has decreased, its still clear that the movie is still extremely popular, attracting new viewers and creating a loyal fan base. The excitement and cultural impact surrounding the movie is evident with a recent Fortnite collaboration featuring *KPop Demon Hunters* skins based on the film's characters. *KPop Demon Hunters* is currently available to stream on Netflix.
+
+
+
+```{r}
+GLOBAL_TOP_10 |>
+  filter(show_title == "KPop Demon Hunters") |>
+  ggplot(aes(x = week, y = weekly_views)) +
+  geom_line(linewidth = 1.2, color = "#FF3D71") +
+  scale_x_date(
+    date_breaks = "1 week",              # show every week
+    date_labels = "%b %d",               # format as "Jul 07", removes year
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  scale_y_continuous(
+    labels = label_number(scale_cut = cut_short_scale())  # e.g. 25M instead of 25000000
+  ) +
+  labs(
+    title = "Global Weekly Views of KPop Demon Hunters (2025)",
+    x = "Week",
+    y = "Weekly Views"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+```
 
 
 
@@ -232,6 +615,7 @@ Some further exploration is needed to understand this data.
 [^num_countries]: 
 Code for total number of countries:  
     ```{r}
+#| eval: FALSE
 #Question 1
 num_country<- COUNTRY_TOP_10 |>
   summarize(n_distinct(country_name))
@@ -240,7 +624,7 @@ num_country<- COUNTRY_TOP_10 |>
 [^top_film_weeks]:  
 Code for top global non-English film:
     ``` {r}
-#| output: False
+#| eval: FALSE
 # Question 2
 top_non_eng_film <- GLOBAL_TOP_10 |>
   filter(category == 'Films (Non-English)') |>
@@ -254,8 +638,9 @@ top_film_weeks <- top_non_eng_film$cumulative_weeks_in_top_10[1]
     ```
     
 [^cease_service]:  
-Code for which country Netlfix stopped service:
+Code for which country Netflix stopped service:
     ``` {r}
+#| eval: FALSE
 #Question 6
 less_200 <- COUNTRY_TOP_10 |> group_by(country_name) |> summarise(total_weeks = n_distinct(week), .groups = "drop") |> filter(total_weeks < 200) 
     
@@ -270,3 +655,163 @@ ceased_info <- less_200 |> inner_join(last_week, by = "country_name")
 #Formatting
 cease_date <- format(ceased_info$last_week, "%B %d, %Y")
     ```
+
+[^squid_game_views]:  
+Code for *Squid Game* total views:
+    ``` {r}
+# Question 7
+#| eval: FALSE
+squid_game_views <- GLOBAL_TOP_10 |>
+  filter(show_title == 'Squid Game') |>
+  group_by(show_title) |>
+  summarize(total_views = sum(weekly_views, na.rm = TRUE)) |>
+  pull(total_views)|>
+  scales::comma()
+    ```
+
+[^longest_film]:  
+Code for the longest film (in minutes):
+    ``` {r}
+#| eval: FALSE
+#Question 3
+longest_film <- GLOBAL_TOP_10 |>
+  filter(category == 'Films (Non-English)' |
+           category == 'Films (English)') |>
+  mutate(`Runtime (minutes)` = round(60 * runtime)) |>
+  select(`Film` = show_title, `Runtime (minutes)`) |>
+  distinct() |>
+  slice_max(`Runtime (minutes)`)
+    ```
+
+
+[^top_10_most_countries]:  
+Code for the most countries a film debuted in:
+    ``` {r}
+#| eval: FALSE
+#Question 10
+debut_info <- COUNTRY_TOP_10 |>
+  filter(category == 'TV') |>
+  group_by(show_title, season_title) |>
+  summarize(
+    debut_week = first(week),
+    debut_rank = first(weekly_rank),
+    num_of_countries = n_distinct(country_iso2[week == first(week)]),
+    .groups = "drop"
+  ) |>
+  slice_max(num_of_countries)
+
+most_countries <- debut_info$num_of_countries
+most_countries_title <- debut_info$show_title
+most_countries_season <- debut_info$season_title
+    ``` 
+
+[^red_notice_views]:  
+Code for the amount of views of *Red notice* in 2021:
+    ```{r}
+#| eval: FALSE
+#Question 8
+red_notice_views_2021 <- GLOBAL_TOP_10 |>
+  filter(show_title == 'Red Notice', lubridate::year(week) == 2021) |>
+  summarize(total_views = sum(weekly_hours_viewed, na.rm = TRUE) / 1.97) |>
+  pull(total_views)|>
+  scales::comma()
+    ```
+
+[^late_risers]:
+Code for US films that initially did not debut at #1, but eventually reached there:
+    ```{r}
+#| eval: FALSE
+#Question 9
+COUNTRY_FIRST <- COUNTRY_TOP_10 |>
+  filter(category == 'Films', country_iso2 == "US") |>
+  group_by(show_title) |>
+  mutate(ever_1st = any(weekly_rank == 1)) |>
+  ungroup()
+
+num_late_risers <- COUNTRY_FIRST |>
+  filter(ever_1st) |>
+  group_by(show_title) |>
+  arrange(week) |>
+  summarize(debut_rank = first(weekly_rank), .groups = "drop") |>
+  filter(debut_rank > 1) |>
+  nrow()
+
+recent_late_riser <- COUNTRY_FIRST |>
+  filter(ever_1st) |>
+  group_by(show_title) |>
+  arrange(week) |>
+  mutate(first_week_1st = min(week[weekly_rank == 1])) |>
+  summarize(
+    debut_week = first(week),
+    debut_rank = first(weekly_rank),
+    week_reached_1st = first(first_week_1st),
+    .groups = "drop"
+  ) |>
+  filter(debut_rank > 1) |>
+  slice_max(debut_week, n = 1) |>
+  pull(show_title)
+    ```
+    
+[^stranger_hours]:
+Code for the total amount of hours Stranger Things has been watched:
+    ```{r}
+#| eval: FALSE
+stranger_hours <- GLOBAL_TOP_10 |>
+  filter(show_title == "Stranger Things") |>
+  group_by(show_title) |>
+  summarize(total_hours = sum(weekly_hours_viewed)) |>
+  pull(total_hours)
+  
+si_formatter <- label_number(scale_cut = cut_short_scale(), accuracy = 0.01)
+
+
+stranger_hours_f <- paste0(sub("([KMB])$", " \\1", si_formatter(stranger_hours)))
+    ```
+[^In_unique]:
+Code for the number of unique Indian Shows:
+    ```{r, eval=FALSE}   
+#Filter out India
+INDIA_TOP10 <- COUNTRY_TOP_10 |>
+  filter(country_iso2 == "IN")|>
+  mutate(year = year(week))
+
+#Number of unique indian shows
+num_in_shows_1 <- INDIA_TOP10 |>
+  group_by(show_title) |>
+  summarize(max_rank = min(weekly_rank), .groups = "drop") |>
+  filter(max_rank == 1) |>
+  nrow()    
+    ```
+[^kpop_consecutive]:
+Code for the consecutive weeks Kpop Demon Hunters has been in both #1 and #2:
+    ```{r, eval=FALSE} 
+#Kpop Demon Hunters Consecutive Streak
+kpop_global_streak <- GLOBAL_TOP_10 |>
+  filter(show_title == "KPop Demon Hunters") |>
+  arrange(week) |>
+  mutate(top2 = weekly_rank <= 2)
+
+
+streaks <- rle(kpop_global_streak$top2)
+max_top2_streak <- if(any(streaks$values)) max(streaks$lengths[streaks$values]) else 0
+
+
+# Total weeks ever in top 1
+num_1_kpop_amount<-GLOBAL_TOP_10 |>
+  filter(show_title == "KPop Demon Hunters") |>
+  summarize(sum(weekly_rank == 1)
+  )    
+    ```
+[^kpop_first2]:
+Code for the the number of countries Kpop Demon Hunters achieved #1 within 2 weeks:    
+    ```{r, eval=FALSE} 
+kpop_first2 <- COUNTRY_TOP_10 |>
+  filter(show_title == "KPop Demon Hunters") |>
+  group_by(country_name) |>
+  arrange(week) |>
+  mutate(week_number = row_number()) |>
+  filter(week_number <= 2, weekly_rank == 1) |>
+  ungroup() |>
+  summarize(num_countries_first3_1 = n_distinct(country_name))
+    ```    
+    
