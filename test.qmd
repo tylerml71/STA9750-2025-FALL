@@ -1,0 +1,43 @@
+---
+title: "An example of the `contents` shortcode"
+format: html
+---
+
+## Summary
+
+My grandpa always said, {{< contents best_number >}}, but I also really like
+{{< contents y_def >}} and I format it strangely because I am a scientist.
+
+## I am using a Shortcode
+
+`quarto` "shortcodes" can be used to do some magic when writing a document.
+In this document we use the `contents` shortcode to move _output_ of code 
+above the actual code. The [official docs](https://quarto.org/docs/authoring/contents.html)
+are not super clear, so hopefully this example helps. 
+
+## Much later in the document
+
+You can see how we find the best number using a very advanced algorithm: 
+
+```{r}
+#| results: hold
+
+compute_best_number <- function(){
+    return(3)
+}
+
+x <- compute_best_number()
+
+y <- x + 3
+
+x
+cat("\n") #This should add spacing in between answers
+y
+```
+
+We will define some 'snippets' here, but they do not get printed here because 
+we instead move the output up earlier in the document. 
+
+[The very best number is `{r} x`]{#best_number}
+
+[`{r} formatC(y, format="e", digits=2)`]{#y_def}

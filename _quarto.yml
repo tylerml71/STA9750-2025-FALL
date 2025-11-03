@@ -13,7 +13,8 @@ website:
     background: primary
     search: false
 
-
+filters:
+  - shinylive
 
 format:
   html:

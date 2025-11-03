@@ -11,6 +11,50 @@ I am a **Baruch Graduate Student**, with an expected graduation at **may of 2027
 
 On this site, I have/will have multiple projects that represent my skill set for future employers.
 
+## Links
+
+##### My Github
+<script async defer src="https://buttons.github.io/buttons.js"></script>
+<a class="github-button" href="https://github.com/tylerml71" aria-label="Follow @tylerml71 on GitHub" data-size="large">
+  Follow @tylerml71
+</a>
+
+
+##### My Linkedin
+<a href="https://www.linkedin.com/in/tyler-m-lara/" target="_blank" style="
+  display: inline-flex;
+  align-items: center;
+  background-color: #0A66C2;
+  color: white;
+  font-weight: 500;
+  font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+  padding: 4px 8px;   /* smaller padding */
+  font-size: 14px;      /* smaller font */
+  border-radius: 6px;
+  text-decoration: none;
+">
+  <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/linkedin.svg" 
+       alt="LinkedIn" 
+       style="width:16px; height:16px; vertical-align:middle; margin-right:6px; filter: invert(1);">
+  Connect with me on LinkedIn
+</a>
+
+<a href="assets/Tyler_Lara.pdf" target="_blank" style="
+  display:inline-flex;
+  align-items:center;
+  background-color:#593196; /* Pulse theme purple */
+  color:white;
+  padding:6px 12px;
+  border-radius:6px;
+  text-decoration:none;
+  font-weight:500;
+  font-family:'Segoe UI', Helvetica, Arial, sans-serif;
+">
+ <img src="assets/pdf.png" alt="PDF" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 6px;">
+  View Resume
+</a>
+
+
 ```{r}
 #| echo: false
 #| message: false

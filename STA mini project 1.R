@@ -45,6 +45,7 @@ library(knitr)
 library(kableExtra)
 library(DT)
 library(stringr)
+library(scales)
 
 GLOBAL_TOP_10 |>
   head(n = 20) |>
@@ -121,14 +122,6 @@ GLOBAL_TOP_10 |>
 #Which TV show had the longest consecutive run in a country’s Top 10?
 # How long was this run and in what country did it occur
 
-COUNTRY_TOP_10 |>
-  filter(category == 'TV') |>
-  select(country_name, show_title, cumulative_weeks_in_top_10) |>
-  slice_max(cumulative_weeks_in_top_10)|>
-  rename(`Country` = country_name,
-         `Title` = show_title,
-         `Weeks in top 10` = cumulative_weeks_in_top_10)|>
-  kable(caption = "What TV show has been in top 10 the longest?")
 
 
 COUNTRY_TOP_10 |>
@@ -136,10 +129,8 @@ COUNTRY_TOP_10 |>
   arrange(country_name, show_title, week) |>
   group_by(country_name, show_title) |>
   mutate(
-    # Difference between weeks in days
+
     week_diff = as.numeric(week - lag(week)),
-    
-    # New group whenever gap is not exactly 7 days (i.e., break in consecutive weeks)
     group_id = cumsum(ifelse(is.na(week_diff) |
                                week_diff != 7, 1, 0))
   ) |>
