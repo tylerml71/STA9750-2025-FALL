@@ -28,7 +28,7 @@ body {
 
 ## Introduction
 
-A suitable introduction goes here. In this mini-project, I intend to demonstrate my skills at Data Integration/Data Visualization/Metric Creation in an analysis of Official Statistics/Economic Data/Census Data data.
+In this mini-project, I intend to demonstrate my skills at Data Integration/Data Visualization/Metric Creation in an analysis of Official Statistics/Economic Data/Census Data data.
 
 ## Data Acquisition and Preparation
 
@@ -586,7 +586,7 @@ HOUSEHOLDS |>
 ### Diagram
 
 ```{=html}
-<img src='docs/mp02_files/figure-html/Diagram.png' 
+<img src="docs/images/Diagram.png"
 style="width: 800px; height: 400px; vertical-align: middle;"/>
 ```
 
