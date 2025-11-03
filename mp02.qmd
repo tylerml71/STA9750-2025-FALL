@@ -1449,4 +1449,5 @@ Two simple metrics: Rent Burden, tracking the share of income spent on housing, 
 
 
 ## Final Insights and Deliverable
- Rendered as a Mini-Project for STA 9750 at Baruch College. More details about this course can be found at [the course site](https://michael-weylandt.com/STA9750) and instructions for this assignment can be found at [MP #02](https://michael-weylandt.com/STA9750/miniprojects/mini02.html)
+
+Rendered as a Mini-Project for STA 9750 at Baruch College. More details about this course can be found at [the course site](https://michael-weylandt.com/STA9750) and instructions for this assignment can be found at [MP #02](https://michael-weylandt.com/STA9750/miniprojects/mini02.html)
