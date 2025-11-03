@@ -586,8 +586,8 @@ HOUSEHOLDS |>
 ### Diagram
 
 ```{=html}
-<img src="assets/DATASET_DIAGRAM.png" 
-style="vertical-align:width: 800px; height: 400px; middle;"/>
+<img src='docs/mp02_files/figure-html/Diagram.png' 
+style="width: 800px; height: 400px; vertical-align: middle;"/>
 ```
 
 Constructing a diagram is extremely important when analyzing data, especially when creating and analyzing multiple datasets, or a database. My interpretation of this data set resembles a [star schema](https://www.geeksforgeeks.org/dbms/star-schema-in-data-warehouse-modeling/), which is a common approch to develop or build data warehouses. As the data is semi-denormalized, data is easier to read, analyze, and report. 
