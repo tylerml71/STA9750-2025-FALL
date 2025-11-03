@@ -586,7 +586,7 @@ HOUSEHOLDS |>
 ### Diagram
 
 ```{=html}
-<img src="docs/images/Diagram.png"
+<img src="images/Diagram.png"
 style="width: 800px; height: 400px; vertical-align: middle;"/>
 ```
 
