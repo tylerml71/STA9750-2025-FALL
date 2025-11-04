@@ -823,7 +823,7 @@ RENT|>
 
 #### The relationship between total employment and total employment in the health care and social services sector across different CBSAs.
 
-```{r}
+```{r emp_growth_plot}
 #| message: false
 #| warning: false
 
@@ -1301,9 +1301,9 @@ HOUSING_GROWTH_FLAGGED <- HOUSING_GROWTH |>
   mutate(
     housing_trend = case_when(
       is.na(housing_slope)                     ~ NA_character_,
-      housing_slope >= 8 & pop_slope > 20      ~ "Strong Growth",
-      housing_slope >= 1 &
-        housing_slope < 8 & pop_slope > 0  ~ "Moderate Growth",
+      housing_slope >= 10 & pop_slope > 25      ~ "Strong Growth",
+      housing_slope >= 3 &
+        housing_slope < 10 & pop_slope > 0  ~ "Moderate Growth",
       TRUE                                     ~ "Low Growth"
     ),
     housing_trend = factor(
