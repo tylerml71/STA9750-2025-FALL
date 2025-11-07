@@ -596,11 +596,11 @@ However, this is not exactly required, because `GEOID` and `year` are in 6 of 7 
 
 For this analysis, I decided on the attribute `year` to make a composite key in the data analysis. This solves the issue of data combining over different years, but brings unique challenges as well. For instance, performance can suffer because fields `NAME` and `year` are repeated in every table, increasing storage and processing time. Additionally, incorporating year into the key makes the database much less flexible if I wanted to add a temporal expansion, such as monthly or quarterly data.
 
-To improve this structure, a surrogate key could be introduced as the central identifier for each record. This would become the new center star of the schema, instead of housing. A separate reference or dimension table could be used to store these combinations of `NAME`, `year, and `GEOID`, linking all other tables while reducing redundancy. 
+To improve this structure, a surrogate key could be introduced as the central identifier for each record. This would become the new center star of the schema, instead of housing. A separate reference or dimension table could be used to store these combinations of `NAME`, `year`, and `GEOID`, linking all other tables while reducing redundancy. 
 
 Another important note is that Federal Information Processing Standards (FIPS) is a standardized numeric identifier for geographic areas, while GEOID is a more general geographic identifier. Because of this and because the datasets were imported from different sources, I transformed FIPS, notated in the relational data diagram. 
 
-Finally, the INDUSTRY codes contain four hierarchical levels, increasing in granularity. This creates a many-to-one relationship: multiple records in the wages table map to a single industry code in the reference table.  
+Finally, the INDUSTRY codes contain four hierarchical levels, increasing in granularity. This creates a many-to-one relationship; multiple records in the wages table map to a single industry code in the reference table.  
 
 Overall, while some improvements are possible, this schema is sufficient for a single-use analysis.
 
@@ -793,7 +793,7 @@ PCT_TABLE |>
 
 ```
 
-### Initial Visualizations
+### Task 3: Initial Visualizations
 
 #### The relationship between monthly rent and average household income per CBSA in 2009.
 ```{r}
