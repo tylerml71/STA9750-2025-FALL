@@ -558,7 +558,7 @@ On top of this, Flushing’s dead tree ratio is 12.8%, which is higher than Dist
 
 ```{r}
 #| echo: false
-flushing_trees
+dead_flushing
 ```
 
 Here is a zoomed-in map of District 20 showing all trees, with dead trees highlighted in red. This project will not only enhance environmental resilience but also improve public safety, reduce heat vulnerability, and turn the neighborhood many call home beautiful. Investing in Flushing’s tree health is an investment in the health and well-being of its residents and the sustainability of the city as a whole.
