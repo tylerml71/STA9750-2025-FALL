@@ -16,7 +16,6 @@ website:
         text: "Mini-Project #03"
     background: primary
     search: false
-
 format:
   html:
     theme: pulse
