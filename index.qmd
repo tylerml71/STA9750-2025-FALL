@@ -1,6 +1,5 @@
 ---
-title: "Tyler's Analytics Site
-
+title: "Tyler's Analytics Site"
 
 ---
 #### **Hello, my name is Tyler Lara.** 
