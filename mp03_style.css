@@ -1,0 +1,128 @@
+
+/* Set global CSS variables to Tree/Nature theme */
+:root {
+  --quarto-accent-color: #228B22 !important;       /* Forest Green */
+  --quarto-link-color: #228B22 !important;
+  --quarto-link-hover-color: #556B2F !important;   /* Dark Olive Green */
+  --quarto-primary-color: #228B22 !important;
+}
+
+/* Base link styles */
+a, a:visited {
+  color: #228B22 !important;
+}
+
+a:hover,
+a:focus {
+  color: #556B2F !important;
+  background-color: transparent !important;
+  text-decoration: underline !important;
+}
+
+/* Navbar background and link colors */
+.navbar,
+.quarto-title-block .navbar,
+.navbar.navbar-expand-lg.navbar-dark.bg-primary {
+  background-color: #228B22 !important;
+}
+
+.navbar a,
+.navbar .nav-link {
+  color: #FFFFFF !important;
+}
+
+.navbar a:hover,
+.navbar a:focus,
+.navbar .nav-link:hover,
+.navbar .nav-link:focus {
+  color: #E6F4EA !important; /* Light green hover */
+  background-color: transparent !important;
+  text-decoration: underline !important;
+}
+
+/* TOC */
+.quarto-toc a,
+.toc a {
+  color: #228B22 !important;
+}
+
+.quarto-toc a:hover,
+.quarto-toc a:focus,
+.toc a:hover,
+.toc a:focus {
+  color: #556B2F !important;
+  background-color: transparent !important;
+  text-decoration: underline !important;
+}
+
+.sidebar nav[role="doc-toc"] a.nav-link.active {
+  color: #006400 !important; /* Deep green for active */
+  border-left: 3px solid #006400 !important;
+  background-color: transparent !important;
+  font-weight: bold !important;
+}
+
+/* Header anchors */
+.header-anchor:hover,
+.header-anchor:focus {
+  color: #228B22 !important;
+}
+
+/* Accent borders or highlights */
+.border-accent,
+.highlight {
+  border-color: #228B22 !important;
+  background-color: #E6F4EA !important;
+}
+
+/* Focus outlines */
+:focus {
+  outline-color: #228B22 !important;
+}
+
+/* Tooltip styling */
+.custom-tooltip {
+  color: #556B2F !important;
+  font-weight: bold;
+}
+
+/* Footnotes code block color */
+.footnotes pre,
+.footnotes code {
+  background-color: #f8f9fa !important;
+}
+
+/* Index number style */
+.index-number {
+  color: #006400 !important;
+  font-weight: bold;
+}
+
+/* Code tools buttons */
+.code-tools .btn,
+.code-tools .btn:hover,
+.code-tools .btn:focus,
+.code-tools .btn:active,
+.code-tools .btn-primary {
+  background-color: #f8f9fa !important;
+  border-color: #ced4da !important;
+  color: #212529 !important;
+  box-shadow: none !important;
+}
+
+.navbar-brand {
+  color: white !important;
+  font-weight: normal !important;
+}
+
+.navbar .nav-link.active {
+  color: white !important;
+  font-weight: normal !important;
+}
+
+.sidebar nav[role="doc-toc"] a.nav-link:not(.active):hover,
+.quarto-margin-sidebar a.nav-link:not(.active):hover {
+    color: #556B2F !important;
+    background-color: transparent !important;
+    text-decoration: underline !important;
+}

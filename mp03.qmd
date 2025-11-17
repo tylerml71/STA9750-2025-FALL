@@ -1,0 +1,572 @@
+---
+title: "Mini-Project 03 - Visualizing and Maintaining the Green Canopy of NYC"
+editor:
+    mode: source
+format:
+    html:
+      toc: true
+      toc-depth: 3
+      toc-location: left
+      sections: true
+      toc-floating: true
+      code-fold: true
+      code-summary: "Show the code"
+      code-tools:
+          toggle: true
+          source: true
+          caption: "code"
+      css: mp03_style.css
+freeze: true
+execute:
+    cache: true
+---
+
+## Introduction
+
+When you're in a city full of high-risers and densely packed apartments, its easy to forget about the importance of having trees populated in every street. They [provide many benefits](https://data.cityofnewyork.us/Environment/Forestry-Tree-Points/hn5i-inap/about_data) to the city and its residents. They reduce air pollution, cool sidewalks with shade, reduce toxic runoff, and add some extra wildlife to our cities. Thankfully, we have official organizations like the [NYC Parks & Recreation center](https://www.nycgovparks.org/) to track and take care of trees throughout our city.
+
+In this project, I will be using two different datasets from NYC Open Data and The Department of City Planning. The former will be used to analyze all sorts of information regarding trees planted throughout NYC, and the latter for constructing maps.
+
+## Data Acquisition and Preparation
+
+###Packages
+
+As usual, multiple packages will be used for this project. A few extra packages are being used for this project, such as `sf`, which allows spacial data to be read, and perform spatial operations.
+
+```{r setup}
+#| echo: true
+#| include: true
+#| output: false
+#| cache: true
+
+ensure_package <- function(pkg) {
+  pkg <- as.character(substitute(pkg))          
+  options(repos = c(CRAN = "https://cloud.r-project.org"))
+  
+  if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
+    install.packages(pkg)
+  }
+  
+  if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
+    stop(paste("Package", pkg, "could not be loaded"))
+  }  
+}
+library(sf)  
+ensure_package(httr2)
+ensure_package(sf)
+ensure_package(dplyr)
+ensure_package(glue)
+ensure_package(extrafont)
+ensure_package(ggplot2)
+ensure_package(leaflet)
+ensure_package(ggspatial)
+ensure_package(patchwork)
+ensure_package(ggthemes)
+ensure_package(scico)
+ensure_package(stringr)
+ensure_package(kableExtra)
+ensure_package(scales)
+
+```
+
+### City Council Districts
+
+Let's download the City council districts from [The Department of City Planning website](https://www.nyc.gov/content/planning/pages/resources/datasets/city-council). Essentially, this dataset contains the boundaries of every single district in NYC. This is crucial for future analysis, as majority of the exploratory analysis will be conducted through geospacial data analysis, essentially making maps.
+
+As mentioned before, we will be using the `sf` package to download the data correctly, with the function `st_read`. In order to avoid repeatably downloading the data, I made the choice to download the data as a function to check if the data has already been downloaded, and only download it if it hasn't. Since this file is hosted as a static file, we can quickly download it and make a local directory to store the data
+
+```{r}
+
+#| echo: true
+#| include: true
+#| output: false
+#| cache: true
+download_nycc_boundaries <- function(
+  url = "https://s-media.nyc.gov/agencies/dcp/assets/files/zip/data-tools/bytes/city-council/nycc_25c.zip"
+) {
+  # Set destination folder and file paths
+  dest_dir <- file.path("data", "mp03")
+  zip_file <- file.path(dest_dir, basename(url))
+
+  # Create directory if it doesn't exist
+  if (!dir.exists(dest_dir)) {
+    dir.create(dest_dir, recursive = TRUE)
+  }
+
+  # Download zip file if it doesn't exist
+  if (!file.exists(zip_file)) {
+    download.file(url, destfile = zip_file, mode = "wb")
+  }
+
+  # List contents of the zip to find the .shp file
+  zip_contents <- unzip(zip_file, list = TRUE)
+  shp_file_rel <- zip_contents$Name[grepl("\\.shp$", zip_contents$Name, ignore.case = TRUE)]
+
+  if (length(shp_file_rel) == 0L) {
+    stop("No .shp file found in the zip archive.")
+  }
+
+  # Use the first .shp file found
+  shp_file_rel <- shp_file_rel[1]
+  shp_file <- file.path(dest_dir, shp_file_rel)
+
+  # Unzip only if shapefile doesn't exist
+  if (!file.exists(shp_file)) {
+    unzip(zip_file, exdir = dest_dir)
+  }
+
+  # Read and transform shapefile
+  sf_data <- st_read(shp_file, quiet = TRUE)
+  sf_data_wgs84 <- st_transform(sf_data, crs = "WGS84")
+
+  return(sf_data_wgs84)
+}
+
+  
+nyc_boundaries <- download_nycc_boundaries()
+
+
+
+```
+
+### NYC Open Data
+
+The next dataset will be from *Forestry Tree Points* on the [NYC Open Data](https://data.cityofnewyork.us/Environment/Forestry-Tree-Points/hn5i-inap/about_data) site from the provided API. However, downloading this dataset like the last one leads to downloading the first 100 trees. This is a problem, because we need *all* of the data to accurately analyze the data. To fix this problem, I increased the limit of downloads from 1,000 to 100,000 rows. I then found out that the dataset is much larger than that, so i made a plan to make another function. The main purpose of it is to repeatedly download the data at batches of 100,000 rows, and eventually stop if the amount of rows it downloads is less than the batch amount. Finally, we bind all of the rows together create one complete dataset.
+
+With 11 files created in this download, this means that there are likely more than ***one million*** trees in this city! There one thing to note, this dataset does not include parks; the amount of trees in NYC would likely be even higher than before. This site also has a data dictionary for us to reference if we are unsure what a variable means.
+
+```{r}
+#| echo: true
+#| include: true
+#| output: false
+
+
+# Function to download NYC tree points data in chunks and combine into one sf object
+
+download_nyc_tree_points <- function(
+  base_url = "https://data.cityofnewyork.us/resource/hn5i-inap.geojson",
+  limit = 100000  # Number of rows to fetch per request
+) {
+  # Directory where downloaded files will be saved
+  dest_dir <- file.path("data", "mp03")
+
+  # Initialize offset for pagination (start at 0)
+  offset <- 0
+
+  # List to store all downloaded sf objects
+  all_files <- list()
+
+  # Repeat until no more data is returned
+  repeat {
+    # Convert offset to string (avoid scientific notation)
+    offset_str <- format(offset, scientific = FALSE)
+
+    # Create file name for this chunk based on offset
+    file_name <- glue("tree_points_{offset_str}.geojson")
+    file_path <- file.path(dest_dir, file_name)
+
+    # If file does not exist locally, download it
+    if (!file.exists(file_path)) {
+      # Build the request using httr2
+      req <- request(base_url) |>
+        req_url_query(`$limit` = limit, `$offset` = offset_str) |> 
+        # Add query params for pagination
+        req_user_agent("Baruch College Mini-Project for Student, API access") |> 
+        req_perform()
+
+      # Save raw response body to file
+      writeBin(resp_body_raw(req), file_path)
+    }
+
+    # Try reading the GeoJSON file into an sf object
+    sf_data <- tryCatch({
+      sf::st_read(file_path, quiet = TRUE) # Read spatial data quietly
+    }, error = function(e) {
+      # If reading fails, print message and return NULL
+      message(glue("Failed to read file at offset {offset_str}: {e$message}"))
+      return(NULL)
+    })
+
+    # If no data returned or read failed, break the loop
+    if (is.null(sf_data) || nrow(sf_data) == 0) {
+      break
+    }
+
+    # Normalize planteddate column to character (avoid issues with mixed types)
+    if ("planteddate" %in% names(sf_data)) {
+      sf_data$planteddate <- as.character(sf_data$planteddate)
+    }
+    # Append this chunk to the list
+    all_files[[length(all_files) + 1]] <- sf_data
+    # If fewer rows than limit were returned, stop
+    if (nrow(sf_data) < limit) {
+      break
+    }
+
+    # Otherwise, increase offset and continue
+    offset <- offset + limit
+  }
+
+  # Combine all chunks into one data frame
+  combined_data <- rbindlist(all_files, fill = TRUE)
+
+  # Return the combined sf object
+  return(combined_data)
+}
+
+tree_points <- readRDS("data/mp03/tree_points_sample.rds")
+
+```
+
+Although I would like to use all trees available in NYC, there are simply too many. Rendering becomes an issue, where it can take 15+ minutes to render everything, even with 32 gigabytes of DDR4 Ram. As this is a hardware issue, we will reduce the size to four hundred thousand rows to process everything faster.
+```{r}
+tree_points_samp<- tree_points|>
+  slice_sample(n=400000)
+
+bbox <- st_bbox(nyc_boundaries)
+tree_points_samp <- tree_points_samp[st_intersects(tree_points_samp, st_as_sfc(bbox), sparse = FALSE), ]
+```
+
+## Exploratory Analysis
+
+### Mapping NYC Trees
+
+As said before, there are a *lot* of trees in NYC, likely more than a million. A simple map plotting points of all trees would not work well, dots would overlap each other, and overall just make a big green blob. Changing the `alpha` or `size` wouldn't help much either. So, I went the route of using leaflet instead of ggplot for this specific map. Here, you can zoom in and click to see the species and overall health of the tree.
+
+```{r}
+#| cache: true
+# Clean species names and prepare color mapping
+
+tree_points_map <- tree_points_samp |>
+  slice_sample(n = 20000) |>  # sample 20,000 points for speed
+  mutate(
+    genusspecies = str_to_title(str_extract(genusspecies, "[^-]+$")),
+    color = case_when(
+      tpcondition == "Excellent" ~ "#006400",
+      tpcondition == "Good" ~ "#2A9E00",
+      tpcondition == "Fair" ~ "#FFD700",
+      tpcondition == "Poor" ~ "#FF8C00",
+      tpcondition == "Critical" ~ "#FF4500",
+      tpcondition == "Dead" ~ "#8B0000",
+      TRUE ~ "#A9A9A9"
+    )
+  )
+
+
+# Build interactive map
+leaflet(tree_points_map) |>
+  addProviderTiles("CartoDB.Positron") |>
+  addPolygons(
+    data = nyc_boundaries,
+    color = "black",
+    weight = 1,
+    fillColor = "grey90"
+  ) |>
+  addCircleMarkers(
+    radius = 3,
+    color = ~color,  # Use dynamic color
+    stroke = FALSE,
+    fillOpacity = 0.6,
+    popup = ~paste(
+      "<b>Species:</b>", genusspecies,
+      "<br><b>Condition:</b>", tpcondition
+    )
+  )
+
+
+```
+
+### District-level Analysis of Trees
+
+#### Which council district has the most trees?
+
+In order to conduct further analysis on NYC trees, I joined the Tree Points dataset onto the District Boundaries using `st_join` and `st_contains`, which allowed me to perform a spacial join. However, loading issues appear with the geometry whenever there are summarizations in a code block. A quick fix is to use `st_drop_geometry`, and either join it back using a regular `join` function later, or call the variable later on in the plot.
+
+```{r}
+#| cache: true
+
+# Compute tree counts per district using fast spatial intersection
+nyc_boundaries$num_trees <- lengths(st_intersects(nyc_boundaries, tree_points_samp))
+
+# Find district with max trees
+highlight <- nyc_boundaries |>
+  slice_max(num_trees, n = 1)
+
+# Plot
+ggplot() +
+  geom_sf(data = nyc_boundaries, aes(fill = num_trees), color = "white") +
+  geom_sf(data = highlight, fill = NA, color = "red", size = 1.2) +
+  scale_fill_gradient(low = "lightgreen", high = "darkgreen") +
+  theme_void() +
+  labs(
+    title = "Number of Trees per District",
+    caption = glue("District {highlight$CounDist} has the most trees ({highlight$num_trees})"),
+    fill = "Number of Trees"
+  )
+
+
+
+  
+```
+
+#### Which council district has the highest density of trees?
+
+This plot is similar to the previous one, with the difference being tree density instead of the amount of trees. However, districts vary in size, and larger districts will tend to have more trees because of this. For example, district `r highlight$CounDist` has `highlight$num_trees`. While it might look better than all other districts, if its larger, it's tree coverage is actually lower.
+
+Tree density addresses this by measuring the number of trees per mile. This metric reveals how well a district is covered by trees relative to its size, making it a fairer comparison across districts.
+
+```{r}
+#| cache: true
+
+# Compute tree counts per district (fast)
+nyc_boundaries$num_trees <- lengths(st_intersects(nyc_boundaries, tree_points_samp))
+
+# Compute density: trees per square mile
+tree_density <- nyc_boundaries |>
+  mutate(
+    trees_per_mi = round(num_trees / (Shape_Area / 27878400), 1)  # ft² → mi²
+  )
+
+# Find district with max density
+max_density <- tree_density |>
+  st_drop_geometry() |>
+  slice_max(trees_per_mi, n = 1)
+
+# Plot
+ggplot(tree_density) +
+  geom_sf(aes(fill = trees_per_mi), color = "white", linewidth = 0.2) +
+  geom_sf(data = filter(tree_density, CounDist == max_density$CounDist),
+          fill = NA, color = "red", size = 1) +
+  scale_fill_gradient(
+    low  = "lightgreen",
+    high = "darkgreen",
+    name = expression("Trees per mi"^2)
+  ) +
+  labs(
+    title   = "Tree Density per District",
+    caption = glue("District {max_density$CounDist} has the highest tree density, with {max_density$trees_per_mi} Trees per mi²")
+  ) +
+  theme_void() +
+  theme(
+    plot.title   = element_text(face = "bold", hjust = 0.5),
+    legend.position = "right"
+  )
+
+
+```
+#### Which district has highest fraction of dead trees out of all trees?
+
+Similar to before, we will make a map showing trees across NYC, but instead the percentage of dead trees. Having a dense ratio of trees is important, but so is the ratio of dead trees. Although dead trees are important for the the life cycle in an ecosystem, but does not really provide the benefits a tree usually would for a city. Thus, its important to know if a district is losing trees or not.
+
+```{r}
+
+#| cache: true
+
+# Filter dead trees
+dead_trees <- tree_points_samp |> filter(tpcondition == "Dead")
+
+# Count dead trees per district using intersection
+dead_counts <- lengths(st_intersects(nyc_boundaries, dead_trees))
+
+# Add counts and compute ratio
+nyc_boundaries <- nyc_boundaries |>
+  mutate(
+    num_trees = lengths(st_intersects(nyc_boundaries, tree_points_samp)),  # total trees
+    n_dead = dead_counts,
+    dead_frac = n_dead / num_trees
+  )
+
+# Find district with max dead tree ratio
+max_dead <- nyc_boundaries |>
+  st_drop_geometry() |>
+  slice_max(dead_frac, n = 1)
+
+# Plot
+ggplot(nyc_boundaries) +
+  geom_sf(aes(fill = dead_frac), color = "white", linewidth = 0.2) +
+  geom_sf(data = filter(nyc_boundaries, CounDist == max_dead$CounDist),
+          fill = NA, color = "red", size = 1) +
+  scale_fill_gradientn(
+    colours = c("#FFFFCC", "darkgreen", "#4D004B"),
+    values = scales::rescale(c(0, 0.5, 1)),
+    name = "Dead Tree Ratio"
+  ) +
+  theme_void() +
+  labs(
+    title = "Fraction of Dead Trees per District",
+    caption = glue("District {max_dead$CounDist} has the highest ratio of dead trees ({round(max_dead$dead_frac, 2)}).")
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "right"
+  )
+
+```
+
+#### What is the most common tree species in Manhattan?
+
+The dataset does not have boroughs automatically in the dataset, so I made a `case_when` argument to label the borough based on the district number. After that, we can go ahead and find the 5 most common tree species in Manhattan.
+
+
+```{r}
+#| cache: true
+
+
+nyc_boundaries <- nyc_boundaries |>
+  mutate(Borough = case_when(
+    CounDist >= 1  & CounDist <= 10 ~ "Manhattan",
+    CounDist >= 11 & CounDist <= 18 ~ "Bronx",
+    CounDist >= 19 & CounDist <= 32 ~ "Queens",
+    CounDist >= 33 & CounDist <= 48 ~ "Brooklyn",
+    CounDist >= 49 & CounDist <= 51 ~ "Staten Island"
+  ))
+
+# Filter tree points that intersect Manhattan polygons
+manhattan_trees <- tree_points_samp[st_intersects(tree_points_samp, nyc_boundaries |> filter(Borough == "Manhattan"), sparse = FALSE), ]
+
+# Summarize top species in Manhattan
+top_species <- manhattan_trees |>
+  st_drop_geometry() |>
+  group_by(genusspecies) |>
+  filter(!is.na(genusspecies))|>
+  summarise(number_of_spec = n(), .groups = "drop") |>
+  arrange(desc(number_of_spec)) |>
+  mutate(
+    genusspecies = str_to_title(str_extract(genusspecies, "[^-]+$")),
+    Percentage = percent(number_of_spec / sum(number_of_spec), accuracy = 0.01)
+  ) |>
+  slice_max(order_by = number_of_spec, n = 5) |>
+  mutate(number_of_spec = comma(number_of_spec)) |>
+  rename(`Species` = genusspecies, `Amount of Trees` = number_of_spec)
+
+# Display table
+top_species |>
+  kbl(align = c("l", "c", "c"),
+    caption = "Top 5 Closest Trees to Baruch College") |>
+  kable_minimal(c("hover", "condensed", "responsive"),
+                full_width = FALSE, font_size = 15) |>
+  kable_styling(full_width = FALSE) |>   
+  column_spec(1, color = "darkgreen") |>
+  column_spec(2, bold = TRUE) |>
+  column_spec(3, color = "gray40")
+
+
+
+```
+
+#### What is the species of the tree closest to Baruch’s campus?
+
+Finally, let's do something that is more for fun than analysis. We have geospacial data, so all that is needed to be dome is transforming the values for accurate distances.
+
+```{r}
+#| cache: true
+
+# Baruch College point (lon, lat)
+baruch_point <- st_sfc(st_point(c(-73.9836, 40.7402)), crs = 4326)
+
+# Transform both to projected CRS for accurate distance in feet
+tree_points_proj <- st_transform(tree_points_samp, 2263)   # NYC State Plane (feet)
+baruch_proj <- st_transform(baruch_point, 2263)
+
+# Compute distances and get top 5 closest trees
+tree_points_proj |>
+  mutate(distance = as.numeric(st_distance(geometry, baruch_proj))) |>  # convert to numeric
+  arrange(distance) |>
+  slice_head(n = 5) |>
+  mutate(
+    Species = str_to_title(str_extract(genusspecies, "[^-]+$")),
+    distance = round(distance, 1)  # clean numeric, no units
+  ) |>
+  select(Species, Condition = tpcondition, `Distance (in ft)`= distance)|>
+  st_drop_geometry()|>
+  kbl(align = c("l", "c", "c"),
+      caption = "Top 5 Closest Trees to Baruch College") |>
+  kable_minimal(c("hover", "condensed", "responsive"),
+                full_width = FALSE, font_size = 15) |>
+  column_spec(1, color = "darkgreen") |>
+  column_spec(3, bold = TRUE)
+
+```
+
+
+## Final Insights and Deliverable
+### Proposal: Tree Revitalization Program for Flushing (District 20)
+
+```{r}
+
+#| output: false
+#Map of Flushing trees
+flushing_trees <- tree_points_samp[st_intersects(tree_points_samp, nyc_boundaries %>% filter(CounDist == 20), sparse = FALSE), ]
+
+dead_flushing<- leaflet(flushing_trees) %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addPolygons(data = nyc_boundaries %>% filter(CounDist == 20),
+              color = "black", weight = 2, fillColor = "transparent") %>%
+  addCircleMarkers(radius = 3,
+                   color = ~case_when(tpcondition == "Dead" ~ "red", TRUE ~ "darkgreen"),
+                   stroke = FALSE, fillOpacity = 0.6,
+                   popup = ~paste("<b>Species:</b>", genusspecies, "<br><b>Condition:</b>", tpcondition))
+
+#Dead tree map highlighting Flushing
+dead_ratio <- nyc_boundaries |>
+  mutate(dead_frac = n_dead / num_trees)
+
+dead_plot<- ggplot(dead_ratio) +
+  geom_sf(aes(fill = dead_frac), color = "white") +
+  scale_fill_gradientn(colours = c("#FFFFCC","darkgreen","#4D004B"),
+                       values = scales::rescale(c(0, 0.5, 1)),
+                       name = "Dead Tree Ratio") +
+  geom_sf(data = filter(dead_ratio, CounDist == 20), fill = NA, color = "red", size = 1.2) +
+  theme_void() +
+  labs(title = "Dead Tree Ratio Across Districts")
+
+
+
+# Compute tree density per district
+nyc_boundaries <- nyc_boundaries |>
+  mutate(tree_density = round(num_trees / (Shape_Area / 27878400), 1))  # ft² → mi²
+
+# Select Flushing (District 20) and comparison districts
+comparison_table <- nyc_boundaries |>
+  filter(CounDist %in% c(20, 7, 41, 44)) |>
+  st_drop_geometry() |>
+  select(District = CounDist,
+         `Tree Density (trees/mi²)` = tree_density,
+         `Dead Tree Ratio` = dead_frac) |>
+  mutate(`Dead Tree Ratio` = percent(`Dead Tree Ratio`, accuracy=.1))|>
+  kbl( caption = "Tree Density and Dead Tree Ratio by District") |>
+  kable_minimal(full_width = FALSE, font_size = 14) |>
+  column_spec(2, color = "gray40") |>
+  column_spec(3, color = "gray40")
+
+
+```
+
+
+Flushing, located in District 20 of Queens, is one of the most vibrant and densely populated neighborhoods in New York City. However, its tree coverage lags behind other districts. Because of this, residents are left vulnerable to urban heat, poor air quality, and toxic water. We propose a Tree Revitalization and Planting Program to enhance green infrastructure, improve public health, and beautify the community.
+
+The proposed initiative will focus on replacing 500 dead or critical condition trees, planting 1,000 new trees, and removing 200 stumps to prepare sites for future growth. Species selection will prioritize resilient varieties such as Thornless Honeylocust and London Planetree, which thrive in urban environments. Additionally, a maintenance program will be implemented to monitor and care for high-risk trees, reducing hazards and ensuring long-term sustainability.
+
+```{r}
+#| echo: false
+comparison_table
+
+dead_plot
+```
+
+Flushing ( stands out as a priority for this investment because its tree density is among the lowest in Queens. It averages approximately 1,464 trees per square mile. Compared to other districts, such as District 7 (2,854 trees/mi²), District 41 (1,846 trees/mi²) and District 44 (1,794 trees/mi²), the district has a relatively low density overall.
+On top of this, Flushing’s dead tree ratio is 12.8%, which is higher than District 7 (9.8%), and significantly higher than District 41 (7.2%) and District 44 (7.1%). 
+
+```{r}
+#| echo: false
+flushing_trees
+```
+
+Here is a zoomed-in map of District 20 showing all trees, with dead trees highlighted in red. This project will not only enhance environmental resilience but also improve public safety, reduce heat vulnerability, and turn the neighborhood many call home beautiful. Investing in Flushing’s tree health is an investment in the health and well-being of its residents and the sustainability of the city as a whole.
+
+
+
+
+------------------------------------------------------------------------
+
+This work ©2025 by tylerml71 was initially prepared as a Mini-Project for STA 9750 at Baruch College. More details about this course can be found at [the course site](https://michael-weylandt.com/STA9750) and instructions for this assignment can be found at [MP #03](https://michael-weylandt.com/STA9750/miniprojects/mini03.html)
