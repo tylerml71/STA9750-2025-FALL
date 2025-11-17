@@ -545,7 +545,7 @@ comparison_table <- nyc_boundaries |>
 
 Flushing, located in District 20 of Queens, is one of the most vibrant and densely populated neighborhoods in New York City. However, its tree coverage lags behind other districts. Because of this, residents are left vulnerable to urban heat, poor air quality, and toxic water. We propose a Tree Revitalization and Planting Program to enhance green infrastructure, improve public health, and beautify the community.
 
-The proposed initiative will focus on replacing 500 dead or critical condition trees, planting 1,000 new trees, and removing 200 stumps to prepare sites for future growth. Species selection will prioritize resilient varieties such as Thornless Honeylocust and London Planetree, which thrive in urban environments. Additionally, a maintenance program will be implemented to monitor and care for high-risk trees, reducing hazards and ensuring long-term sustainability.
+The proposed initiative will focus on replacing 500 dead or critical condition trees, planting 1,000 new trees, and removing 200 stumps to prepare sites for future growth. Species selection will prioritize resilient varieties such as Thornless Honeylocust and London Planetree, which thrive in urban environments. Additionally, a maintenance program will be implemented to monitor and care for high-risk trees, reducing hazards and ensuring long-term sustainability. 
 
 ```{r}
 #| echo: false
