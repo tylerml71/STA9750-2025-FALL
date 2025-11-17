@@ -10,7 +10,7 @@
 */_freeze/
 *_files/
 !docs/mp02_files/figure-html/
-
+!docs/mp03_files/figure-html/
 data/
 **/*.csv
 **/*.tsv
@@ -28,4 +28,4 @@ data/
 
 /Labs and Preassignments/
 
-/.quarto/
+/.quarto/mp03_cache/
