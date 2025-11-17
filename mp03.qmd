@@ -16,7 +16,6 @@ format:
           source: true
           caption: "code"
       css: mp03_style.css
-freeze: true
 execute:
     cache: true
 ---
