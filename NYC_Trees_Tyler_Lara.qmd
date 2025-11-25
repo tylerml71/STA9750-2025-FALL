@@ -4,7 +4,7 @@ project:
   type: default
 format:
   revealjs:
-    theme: [default, Trees_Present.css]  
+    theme: [default, Trees_Present.scss]  
     code-fold: true
     code-summary: "Show code"
     title-slide-attributes:
@@ -26,9 +26,6 @@ include-in-header:
         display: inline-block;
       }
       </style>
-resources:
-  - Trees_Present.scss
-  - ../images/
 execute:
   warning: false
   message: false
