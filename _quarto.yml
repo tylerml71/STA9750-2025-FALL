@@ -14,6 +14,8 @@ website:
         text: "Mini-Project #02"
       - href: mp03.qmd
         text: "Mini-Project #03"
+      - href: slides/NYC_Trees_Tyler_Lara.html
+
     background: primary
     search: false
 format:
