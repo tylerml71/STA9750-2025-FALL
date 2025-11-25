@@ -1,0 +1,527 @@
+---
+title: "Maintaining the Green Canopy of NYC"
+project:
+  type: default
+  output-dir: ../docs/slides
+format:
+  revealjs:
+    theme: [default, Trees_Present.scss]
+    code-fold: true           
+    code-summary: "Show code" 
+    title-slide-attributes:
+      center-title-slide: false
+      data-background-image: "/images/title-tree.jpg"
+      data-background-size:  100%
+      data-background-position: center
+    width: 100%
+    center: false
+    auto-stretch: true
+include-in-header:
+  - text: |
+      <style>
+      #title-slide h1, #title-slide h2, #title-slide .title {
+        background-color: rgba(128,128,128,0.8); /* semi-transparent grey */
+        color: #FFFFFF;                          /* white text */
+        padding: 10px;                           /* space around text */
+        border-radius: 8px;                      /* rounded corners */
+        display: inline-block;                   /* shrink to text width */
+      }
+      </style>
+resources:
+  - ../images/
+execute:
+  warning: false
+  message: false
+  dir: project
+  cache: true
+---
+
+```{r setup}
+#| echo: false
+#| include: false
+#| eval: true
+
+library(httr2)
+library(sf)
+library(dplyr)
+library(glue)
+library(extrafont)
+library(ggplot2)
+library(leaflet)
+library(ggspatial)
+library(patchwork)
+library(ggthemes)
+library(scico)
+library(stringr)
+library(kableExtra)
+library(scales)
+library(cowplot)
+
+```
+
+## Main Question {data-background-image="/images/blooming-trees.jpg" data-background-size="cover" data-background-position="center"}
+
+. . .
+
+::: {style="background-color: rgba(0,0,0,0.6); color: white; padding: 20px; border-radius: 8px; text-align: center; font-size: 1.5em; margin-top: 200px;"}
+**Why should District 20 receive priority funding for tree revitalization and planting?**
+:::
+
+## Tree Benefits
+
+::: incremental
+-   Shade and cooling
+-   Air Quality Improvement
+-   Reduces Flooding
+-   Helps mental health
+-   More wildlife
+:::
+
+## Who takes care of Trees?
+
+::: incremental
+-   [Department of Parks and Recreation](https://council.nyc.gov/compliance/nycc-soc-report-card/parks-and-recreation/)
+
+- Also over 550 non-profit orgs and volunteer groups
+- Budget of $583 Million
+- Over 5,000 employees
+    -   over 500 different species planted
+:::
+
+## Sources
+
+<section class="scrollable">
+
+::: incremental
+-   Department of City Planning
+    -   Getting boundaries of city
+
+    ```{r}
+#| echo: true
+#| include: true
+#| output: false
+#| cache: true
+#| code-fold: true
+
+
+download_nycc_boundaries <- function(
+  url = "https://s-media.nyc.gov/agencies/dcp/assets/files/zip/data-tools/bytes/city-council/nycc_25c.zip"
+) {
+  # Set destination folder and file paths
+  dest_dir <- file.path("..", "data", "mp03")
+  zip_file <- file.path(dest_dir, basename(url))
+
+  # Create directory if it doesn't exist
+  if (!dir.exists(dest_dir)) {
+    dir.create(dest_dir, recursive = TRUE)
+  }
+
+  # Download zip file if it doesn't exist
+  if (!file.exists(zip_file)) {
+    download.file(url, destfile = zip_file, mode = "wb")
+  }
+
+  # List contents of the zip to find the .shp file
+  zip_contents <- unzip(zip_file, list = TRUE)
+  shp_file_rel <- zip_contents$Name[grepl("\\.shp$", zip_contents$Name, ignore.case = TRUE)]
+
+  if (length(shp_file_rel) == 0L) {
+    stop("No .shp file found in the zip archive.")
+  }
+
+  # Use the first .shp file found
+  shp_file_rel <- shp_file_rel[1]
+  shp_file <- file.path(dest_dir, shp_file_rel)
+
+  # Unzip only if shapefile doesn't exist
+  if (!file.exists(shp_file)) {
+    unzip(zip_file, exdir = dest_dir)
+  }
+
+  # Read and transform shapefile
+  sf_data <- st_read(shp_file, quiet = TRUE)
+  sf_data_wgs84 <- st_transform(sf_data, crs = "WGS84")
+
+  return(sf_data_wgs84)
+}
+
+  
+nyc_boundaries <- download_nycc_boundaries()
+    ```
+
+-   NYC Open Data
+
+    -   Forestry Tree points
+    -   More than **one million** trees
+
+    ```{r}
+#| echo: true
+#| include: true
+#| output: false
+#| cache: true
+#| code-fold: true
+
+
+    # Function to download NYC tree points data in chunks and combine into one sf object
+    download_nyc_tree_points <- function(
+      base_url = "https://data.cityofnewyork.us/resource/hn5i-inap.geojson",
+      limit = 100000  # rows per request
+    ) {
+      # Ensure destination directory exists
+      dest_dir <- file.path("..", "data", "mp03")
+      if (!dir.exists(dest_dir)) dir.create(dest_dir, recursive = TRUE)
+
+      offset <- 0
+      all_files <- list()
+
+      repeat {
+        offset_str <- format(offset, scientific = FALSE)
+        file_name  <- glue::glue("tree_points_{offset_str}.geojson")
+        file_path  <- file.path(dest_dir, file_name)
+
+        if (!file.exists(file_path)) {
+          # Build and perform the request
+          resp <- httr2::request(base_url) |>
+            httr2::req_url_query(`$limit` = limit, `$offset` = offset_str) |>
+            httr2::req_user_agent("Baruch College Mini-Project (student) API access") |>
+            httr2::req_perform()
+
+          # Save raw response to file
+          writeBin(httr2::resp_body_raw(resp), file_path)
+        }
+
+        # Read GeoJSON into sf
+        sf_data <- tryCatch(
+          sf::st_read(file_path, quiet = TRUE),
+          error = function(e) {
+            message(glue::glue("Failed to read file at offset {offset_str}: {e$message}"))
+            NULL
+          }
+        )
+
+        # Stop if no data
+        if (is.null(sf_data) || nrow(sf_data) == 0) break
+
+        # Normalize planteddate column (avoid mixed types across pages)
+        if ("planteddate" %in% names(sf_data)) {
+          sf_data$planteddate <- as.character(sf_data$planteddate)
+        }
+
+        all_files[[length(all_files) + 1]] <- sf_data
+
+        # If we got fewer than the limit, that's the last page
+        if (nrow(sf_data) < limit) break
+
+        offset <- offset + limit
+      }
+
+      if (length(all_files) == 0) {
+        message("No data downloaded.")
+        return(sf::st_sf())  # empty sf
+      }
+
+      # Combine sf chunks; preserves geometry & CRS
+      combined_data <- do.call(rbind, all_files)
+
+      # Make sure CRS is WGS84 (Leaflet expects EPSG:4326)
+      if (!is.na(sf::st_crs(combined_data))) {
+        combined_data <- sf::st_transform(combined_data, 4326)
+      } else {
+        sf::st_crs(combined_data) <- 4326
+      }
+
+      combined_data
+    }
+
+    tree_points <- download_nyc_tree_points()
+tree_points_samp<- tree_points|>
+  slice_sample(n=400000)
+
+    ```
+:::
+
+</section>
+
+## Mapping of Trees
+
+```{r}
+#| label: leaflet-map
+#| echo: true
+#| output: true
+#| code-fold: true
+#| fig-align: center
+#| fig-width: 15    
+# Clean species names and prepare color mapping
+
+tree_points_map <- tree_points |>
+  slice_sample(n = 20000) |>  # sample 20,000 points 
+  mutate(
+    genusspecies = str_to_title(str_extract(genusspecies, "[^-]+$")),
+    color = case_when(
+      tpcondition == "Excellent" ~ "#006400",
+      tpcondition == "Good" ~ "#2A9E00",
+      tpcondition == "Fair" ~ "#FFD700",
+      tpcondition == "Poor" ~ "#FF8C00",
+      tpcondition == "Critical" ~ "#FF4500",
+      tpcondition == "Dead" ~ "#8B0000",
+      TRUE ~ "#A9A9A9"
+    )
+  )
+
+
+# Build interactive map
+leaflet(tree_points_map) |>
+  addProviderTiles("CartoDB.Positron") |>
+  addPolygons(
+    data = nyc_boundaries,
+    color = "black",
+    weight = 1,
+    fillColor = "grey90"
+  ) |>
+  addCircleMarkers(
+    radius = 3,
+    color = ~color,  # Use dynamic color
+    stroke = FALSE,
+    fillOpacity = 0.6,
+    popup = ~paste(
+      "<b>Species:</b>", genusspecies,
+      "<br><b>Condition:</b>", tpcondition
+    )
+  )
+```
+
+## Flushing Map
+```{r}
+#| label: flushing-map
+#| echo: true
+#| include: true
+#| cache: true
+#| output: true
+#| code-fold: true
+#| fig-width: 15        
+#| fig-height: 5
+#| fig-align: center  
+
+
+#Filtering to District 20
+flushing_boundaries  <- nyc_boundaries|>
+  filter(CounDist == 20)
+
+flushing_trees <- st_filter(tree_points, flushing_boundaries)
+
+# Color handling with NA-safe logic
+leaflet(flushing_trees) |>
+  addProviderTiles("CartoDB.Positron") |>
+  addPolygons(
+    data = flushing_boundaries,
+    color = "black", weight = 2, fillColor = "transparent"
+  ) |>
+  addCircleMarkers(
+    radius = 3,
+    color = ~case_when(
+      !is.na(tpcondition) & tpcondition == "Dead" ~ "red",
+      !is.na(tpcondition) & tpcondition == "Critical" ~ "#FF4500",
+      TRUE ~ "darkgreen"
+    ),
+    stroke = FALSE, fillOpacity = 0.6,
+    popup = ~paste0(
+      "<b>Species:</b> ", ifelse(is.na(genusspecies), "Unknown", genusspecies),
+      "<br><b>Condition:</b> ", ifelse(is.na(tpcondition), "Unknown", tpcondition)
+    )
+  )
+```
+
+
+## Why are Dead trees bad?
+
+- Weak root system and branches
+  - Unpredictable in storm
+- Many can spread diseases
+  - Pests (Spotted Lantern Fly, Termites)
+  - Fungal infections
+  - Dutch Elm Disease
+
+
+## Dead Trees Map
+
+<section class="scrollable">
+```{r}
+#| echo: true
+#| include: true
+#| output: true
+#| code-fold: true
+#| fig-width: 10        
+#| fig-height: 3.8
+#| fig-align: center   
+#| dpi: 200
+
+
+# Filter dead/critical trees
+dead_trees <- tree_points_samp|> filter(tpcondition == "Dead"|tpcondition == "Critical")
+# Count dead trees per district using intersection
+dead_counts <- lengths(st_intersects(nyc_boundaries, dead_trees))
+
+# Add counts and compute ratio
+dead_ratio <- nyc_boundaries |>
+  mutate(
+    num_trees = lengths(st_intersects(nyc_boundaries, tree_points_samp)),  # total trees
+    n_dead = dead_counts,
+    dead_frac = n_dead / num_trees
+  )
+
+ggplot(dead_ratio) +
+  geom_sf(aes(fill = dead_frac), color = "white") +
+  scale_fill_gradientn(colours = c("#FFFFCC","darkgreen","#4D004B"),
+                       values = scales::rescale(c(0, 0.5, 1)),
+                       name = "Dead Tree Ratio") +
+  geom_sf(data = filter(dead_ratio, CounDist == 20), fill = NA, color = "red", size = 1.2) +
+  theme_void() +
+  labs(title = "Dead Tree Ratio Across Districts")
+
+```
+</section>
+
+## District Graphs
+<section class="scrollable">
+```{r}
+#| echo: true
+#| include: true
+#| cache: true
+#| output: true
+#| code-fold: true
+#| fig-align: center
+#| error: true
+#| fig-width: 7
+#| fig-height: 4
+
+
+# Compute density and prepare data
+density_boundaries <- nyc_boundaries |>
+  mutate(
+    num_trees = lengths(st_intersects(nyc_boundaries, tree_points_samp)),
+    n_dead = dead_counts,
+    tree_density = round(num_trees / (Shape_Area / 27878400), 1),
+    dead_frac = n_dead / pmax(num_trees, 1)
+  )
+
+plot_data <- density_boundaries |>
+  st_drop_geometry() |>
+  filter(CounDist %in% c(20, 7, 41, 44)) |>
+  select(District = CounDist, tree_density, dead_frac)
+
+# Chart 1: Tree Density
+ggplot(plot_data, aes(
+  x = factor(District), y = tree_density, fill = factor(District))
+  ) +
+  geom_col() +
+  scale_fill_manual(values = c("#006400", "#228B22", "#32CD32", "lightgreen")) +
+  labs(title = "Tree Density", x = "District", y = "Trees per mi²") +
+  theme_cowplot() +
+  theme(legend.position = "none") +
+  scale_y_continuous(expand = c(0, 0))
+```
+</section>
+
+## District Graphs 2
+<section class="scrollable">
+```{r}
+#| echo: true
+#| include: true
+#| cache: true
+#| output: true
+#| code-fold: true
+#| fig-align: center
+#| error: true
+#| fig-width: 7
+#| fig-height: 5
+# Chart 2: Dead Tree Ratio
+ggplot(plot_data, aes(
+  x = factor(District), y = dead_frac, fill = dead_frac)
+  ) +
+  geom_col() +
+  scale_fill_gradient(low = "darkgreen", high = "#4B0082") +
+  scale_y_continuous(labels = percent_format(accuracy = 1), expand = c(0, 0)) +
+  labs(title = "Dead Tree Ratio", x = "District", y = "Ratio") +
+  theme_cowplot() +
+  theme(legend.position = "none")
+
+
+
+
+```
+
+</section>
+
+
+## Proposal
+
+### Improve tree health in district 20
+
+::: incremental
+- Replace 500 dead or critical condition trees with new ones
+  - Thornltess Honeylocust
+  - Swamp White Oak
+  - European Hornbeam 
+- Each costs  **$3,300** on avg
+  - Project costs **$1.65 million**
+:::  
+  
+
+## Implementation Plan
+::: incremental
+- **Phase 1: Assessment (Month 1)**
+    - Verify tree condition data
+
+- **Phase 2: Removal (Months 2–3)**
+    - Safely remove 500 dead or critical trees
+  
+- **Phase 3: Planting (Months 4–6)**
+    - Plant suggested or other trees
+
+- **Phase 4: Maintenance & Monitoring (Months 7–12)**
+    - Regular watering and pruning
+    - Condition updates
+:::
+
+## Limitations
+
+Unfortunately, limitations for this analysis exist.
+
+- Only 400,000 rows of data instead of 1 million
+  - Data processing takes too long
+- Data only includes trees on sidewalks
+  - No to limited trees in parks
+- Species Identification errors
+- Maintenance costs doesn't cover long-term care
+
+# Questions?
+
+## {data-background-image="/images/Diagram.png" data-background-size="cover" data-background-position="center"}
+
+## **2. Sampling & Performance**
+- Memory constraints: Using personal PC
+  -32 gigabytes of ram, but outdated
+- Took upwards of 30 minutes to run/test code
+
+```{r}
+#|output: false
+#|echo: true
+tree_points_samp <- tree_points |> slice_sample(n = 400000)
+```
+
+
+## **Future Work**
+
+::: incremental
+- **Expand Coverage**
+    - Include park trees and private property trees
+    - Integrate additional datasets (soil quality, pollution levels)
+
+- **Predictive Modeling**
+    - Use machine learning to predict tree mortality risk
+    - Features: species, age, location, condition history
+
+- **Scalable Infrastructure**
+    - Move from local R scripts to cloud-based solutions
+    - Use PostGIS or BigQuery instead for large geospatial datasets
+:::
