@@ -2,15 +2,14 @@
 title: "Maintaining the Green Canopy of NYC"
 project:
   type: default
-  output-dir: ../docs/slides
 format:
   revealjs:
-    theme: [default, Trees_Present.scss]  # SCSS stays in slides folder
+    theme: [default, Trees_Present.scss]  
     code-fold: true
     code-summary: "Show code"
     title-slide-attributes:
       center-title-slide: false
-      data-background-image: "../images/title-tree.jpg"  # ✅ relative path
+      data-background-image: "../images/title-tree.jpg"  
       data-background-size: 100%
       data-background-position: center
     width: 100%
@@ -389,7 +388,6 @@ ggplot(dead_ratio) +
 ```{r}
 #| echo: true
 #| include: true
-#| cache: true
 #| output: true
 #| code-fold: true
 #| fig-align: center
@@ -430,7 +428,6 @@ ggplot(plot_data, aes(
 ```{r}
 #| echo: true
 #| include: true
-#| cache: true
 #| output: true
 #| code-fold: true
 #| fig-align: center
