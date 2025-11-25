@@ -5,13 +5,13 @@ project:
   output-dir: ../docs/slides
 format:
   revealjs:
-    theme: [default, Trees_Present.scss]
-    code-fold: true           
-    code-summary: "Show code" 
+    theme: [default, Trees_Present.scss]  # SCSS stays in slides folder
+    code-fold: true
+    code-summary: "Show code"
     title-slide-attributes:
       center-title-slide: false
-      data-background-image: "/docs/images/title-tree.jpg"
-      data-background-size:  100%
+      data-background-image: "../images/title-tree.jpg"  # ✅ relative path
+      data-background-size: 100%
       data-background-position: center
     width: 100%
     center: false
@@ -20,22 +20,23 @@ include-in-header:
   - text: |
       <style>
       #title-slide h1, #title-slide h2, #title-slide .title {
-        background-color: rgba(128,128,128,0.8); /* semi-transparent grey */
-        color: #FFFFFF;                          /* white text */
-        padding: 10px;                           /* space around text */
-        border-radius: 8px;                      /* rounded corners */
-        display: inline-block;                   /* shrink to text width */
+        background-color: rgba(128,128,128,0.8);
+        color: #FFFFFF;
+        padding: 10px;
+        border-radius: 8px;
+        display: inline-block;
       }
       </style>
 resources:
-  - ../images/
   - Trees_Present.scss
+  - ../images/
 execute:
   warning: false
   message: false
   dir: project
   cache: true
 ---
+
 
 
 ```{r setup}
