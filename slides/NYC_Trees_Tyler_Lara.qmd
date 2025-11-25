@@ -10,7 +10,7 @@ format:
     code-summary: "Show code" 
     title-slide-attributes:
       center-title-slide: false
-      data-background-image: "/images/title-tree.jpg"
+      data-background-image: "/docs/images/title-tree.jpg"
       data-background-size:  100%
       data-background-position: center
     width: 100%
@@ -29,12 +29,14 @@ include-in-header:
       </style>
 resources:
   - ../images/
+  - Trees_Present.scss
 execute:
   warning: false
   message: false
   dir: project
   cache: true
 ---
+
 
 ```{r setup}
 #| echo: false
@@ -59,7 +61,7 @@ library(cowplot)
 
 ```
 
-## Main Question {data-background-image="/images/blooming-trees.jpg" data-background-size="cover" data-background-position="center"}
+## Main Question {data-background-image="/docs/images/blooming-trees.jpg" data-background-size="cover" data-background-position="center"}
 
 . . .
 
