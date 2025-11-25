@@ -4,7 +4,7 @@ project:
   type: default
 format:
   revealjs:
-    theme: [default, Trees_Present.scss]  
+    theme: [default, Trees_Present.css]  
     code-fold: true
     code-summary: "Show code"
     title-slide-attributes:

@@ -1,0 +1,26 @@
+
+
+$font-family-sans-serif: "Arial";
+
+
+
+.slide-background-content {
+  background-image: url("/images/trees_background.png"); 
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: top left;
+}
+
+.reveal section:not(#title-slide) h2 {
+  color: #FFFFFF;
+  font-size: 2em;
+  margin-top: -1.5%;
+  margin-bottom: 2.5%;
+}
+
+#title-slide .slide-background-content {
+  background-image: none !important;
+  background-color: white;
+}
+#title-slide h2 { color: #222; margin-top: 0; }
+
