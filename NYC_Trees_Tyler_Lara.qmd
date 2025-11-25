@@ -9,7 +9,7 @@ format:
     code-summary: "Show code"
     title-slide-attributes:
       center-title-slide: false
-      data-background-image: "/images/title-tree.jpg"  
+      data-background-image: "images/title-tree.jpg"  
       data-background-size: 100%
       data-background-position: center
     width: 100%
