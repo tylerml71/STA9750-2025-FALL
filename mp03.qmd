@@ -16,8 +16,6 @@ format:
           source: true
           caption: "code"
       css: mp03_style.css
-execute:
-    cache: true
 ---
 
 ## Introduction
@@ -28,15 +26,12 @@ In this project, I will be using two different datasets from NYC Open Data and T
 
 ## Data Acquisition and Preparation
 
-###Packages
+### Packages
 
 As usual, multiple packages will be used for this project. A few extra packages are being used for this project, such as `sf`, which allows spacial data to be read, and perform spatial operations.
 
 ```{r setup}
 #| echo: true
-#| include: true
-#| output: false
-#| cache: true
 
 ensure_package <- function(pkg) {
   pkg <- as.character(substitute(pkg))          
@@ -50,7 +45,7 @@ ensure_package <- function(pkg) {
     stop(paste("Package", pkg, "could not be loaded"))
   }  
 }
-library(sf)  
+
 ensure_package(httr2)
 ensure_package(sf)
 ensure_package(dplyr)
@@ -80,6 +75,8 @@ As mentioned before, we will be using the `sf` package to download the data corr
 #| include: true
 #| output: false
 #| cache: true
+
+
 download_nycc_boundaries <- function(
   url = "https://s-media.nyc.gov/agencies/dcp/assets/files/zip/data-tools/bytes/city-council/nycc_25c.zip"
 ) {
@@ -140,84 +137,84 @@ With 11 files created in this download, this means that there are likely more th
 #| output: false
 
 
-# Function to download NYC tree points data in chunks and combine into one sf object
 
+# Function to download NYC tree points data in chunks and combine into one sf object
 download_nyc_tree_points <- function(
   base_url = "https://data.cityofnewyork.us/resource/hn5i-inap.geojson",
-  limit = 100000  # Number of rows to fetch per request
+  limit = 100000  # rows per request
 ) {
-  # Directory where downloaded files will be saved
+  # Ensure destination directory exists
   dest_dir <- file.path("data", "mp03")
+  if (!dir.exists(dest_dir)) dir.create(dest_dir, recursive = TRUE)
 
-  # Initialize offset for pagination (start at 0)
   offset <- 0
-
-  # List to store all downloaded sf objects
   all_files <- list()
 
-  # Repeat until no more data is returned
   repeat {
-    # Convert offset to string (avoid scientific notation)
     offset_str <- format(offset, scientific = FALSE)
+    file_name  <- glue::glue("tree_points_{offset_str}.geojson")
+    file_path  <- file.path(dest_dir, file_name)
 
-    # Create file name for this chunk based on offset
-    file_name <- glue("tree_points_{offset_str}.geojson")
-    file_path <- file.path(dest_dir, file_name)
-
-    # If file does not exist locally, download it
     if (!file.exists(file_path)) {
-      # Build the request using httr2
-      req <- request(base_url) |>
-        req_url_query(`$limit` = limit, `$offset` = offset_str) |> 
-        # Add query params for pagination
-        req_user_agent("Baruch College Mini-Project for Student, API access") |> 
-        req_perform()
+      # Build and perform the request
+      resp <- httr2::request(base_url) |>
+        httr2::req_url_query(`$limit` = limit, `$offset` = offset_str) |>
+        httr2::req_user_agent("Baruch College Mini-Project (student) API access") |>
+        httr2::req_perform()
 
-      # Save raw response body to file
-      writeBin(resp_body_raw(req), file_path)
+      # Save raw response to file
+      writeBin(httr2::resp_body_raw(resp), file_path)
     }
 
-    # Try reading the GeoJSON file into an sf object
-    sf_data <- tryCatch({
-      sf::st_read(file_path, quiet = TRUE) # Read spatial data quietly
-    }, error = function(e) {
-      # If reading fails, print message and return NULL
-      message(glue("Failed to read file at offset {offset_str}: {e$message}"))
-      return(NULL)
-    })
+    # Read GeoJSON into sf
+    sf_data <- tryCatch(
+      sf::st_read(file_path, quiet = TRUE),
+      error = function(e) {
+        message(glue::glue("Failed to read file at offset {offset_str}: {e$message}"))
+        NULL
+      }
+    )
 
-    # If no data returned or read failed, break the loop
-    if (is.null(sf_data) || nrow(sf_data) == 0) {
-      break
-    }
+    # Stop if no data
+    if (is.null(sf_data) || nrow(sf_data) == 0) break
 
-    # Normalize planteddate column to character (avoid issues with mixed types)
+    # Normalize planteddate column (avoid mixed types across pages)
     if ("planteddate" %in% names(sf_data)) {
       sf_data$planteddate <- as.character(sf_data$planteddate)
     }
-    # Append this chunk to the list
-    all_files[[length(all_files) + 1]] <- sf_data
-    # If fewer rows than limit were returned, stop
-    if (nrow(sf_data) < limit) {
-      break
-    }
 
-    # Otherwise, increase offset and continue
+    all_files[[length(all_files) + 1]] <- sf_data
+
+    # If we got fewer than the limit, that's the last page
+    if (nrow(sf_data) < limit) break
+
     offset <- offset + limit
   }
 
-  # Combine all chunks into one data frame
-  combined_data <- rbindlist(all_files, fill = TRUE)
+  if (length(all_files) == 0) {
+    message("No data downloaded.")
+    return(sf::st_sf())  # empty sf
+  }
 
-  # Return the combined sf object
-  return(combined_data)
+  # Combine sf chunks; preserves geometry & CRS
+  combined_data <- do.call(rbind, all_files)
+
+  # Make sure CRS is WGS84 (Leaflet expects EPSG:4326)
+  if (!is.na(sf::st_crs(combined_data))) {
+    combined_data <- sf::st_transform(combined_data, 4326)
+  } else {
+    sf::st_crs(combined_data) <- 4326
+  }
+
+  combined_data
 }
 
-tree_points <- readRDS("data/mp03/tree_points_sample.rds")
+tree_points <- download_nyc_tree_points()
+
 
 ```
 
-Although I would like to use all trees available in NYC, there are simply too many. Rendering becomes an issue, where it can take 15+ minutes to render everything, even with 32 gigabytes of DDR4 Ram. As this is a hardware issue, we will reduce the size to four hundred thousand rows to process everything faster.
+Although I would like to use all trees available in NYC, there are simply too many. Rendering becomes an issue, where it can take 15+ minutes to render everything, even with 32 gigabytes of Ram. As this is a hardware issue, we will reduce the size to four hundred thousand rows to process everything faster.
 ```{r}
 tree_points_samp<- tree_points|>
   slice_sample(n=400000)
@@ -232,7 +229,7 @@ tree_points_samp <- tree_points_samp[st_intersects(tree_points_samp, st_as_sfc(b
 
 As said before, there are a *lot* of trees in NYC, likely more than a million. A simple map plotting points of all trees would not work well, dots would overlap each other, and overall just make a big green blob. Changing the `alpha` or `size` wouldn't help much either. So, I went the route of using leaflet instead of ggplot for this specific map. Here, you can zoom in and click to see the species and overall health of the tree.
 
-```{r}
+```{r leaflet-map}
 #| cache: true
 # Clean species names and prepare color mapping
 
@@ -494,18 +491,6 @@ tree_points_proj |>
 ```{r}
 
 #| output: false
-#Map of Flushing trees
-flushing_trees <- tree_points_samp[st_intersects(tree_points_samp, nyc_boundaries %>% filter(CounDist == 20), sparse = FALSE), ]
-
-dead_flushing<- leaflet(flushing_trees) %>%
-  addProviderTiles("CartoDB.Positron") %>%
-  addPolygons(data = nyc_boundaries %>% filter(CounDist == 20),
-              color = "black", weight = 2, fillColor = "transparent") %>%
-  addCircleMarkers(radius = 3,
-                   color = ~case_when(tpcondition == "Dead" ~ "red", TRUE ~ "darkgreen"),
-                   stroke = FALSE, fillOpacity = 0.6,
-                   popup = ~paste("<b>Species:</b>", genusspecies, "<br><b>Condition:</b>", tpcondition))
-
 #Dead tree map highlighting Flushing
 dead_ratio <- nyc_boundaries |>
   mutate(dead_frac = n_dead / num_trees)
@@ -522,11 +507,11 @@ dead_plot<- ggplot(dead_ratio) +
 
 
 # Compute tree density per district
-nyc_boundaries <- nyc_boundaries |>
+density_boundaries <- nyc_boundaries |>
   mutate(tree_density = round(num_trees / (Shape_Area / 27878400), 1))  # ft² → mi²
 
 # Select Flushing (District 20) and comparison districts
-comparison_table <- nyc_boundaries |>
+comparison_table <- density_boundaries |>
   filter(CounDist %in% c(20, 7, 41, 44)) |>
   st_drop_geometry() |>
   select(District = CounDist,
@@ -537,7 +522,6 @@ comparison_table <- nyc_boundaries |>
   kable_minimal(full_width = FALSE, font_size = 14) |>
   column_spec(2, color = "gray40") |>
   column_spec(3, color = "gray40")
-
 
 ```
 
@@ -557,8 +541,38 @@ Flushing ( stands out as a priority for this investment because its tree density
 On top of this, Flushing’s dead tree ratio is 12.8%, which is higher than District 7 (9.8%), and significantly higher than District 41 (7.2%) and District 44 (7.1%). 
 
 ```{r}
-#| echo: false
-dead_flushing
+#Map of Flushing trees
+
+# Ensure consistent CRS for leaflet
+tree_points_samp <- st_transform(tree_points_samp, 4326)
+nyc_boundaries  <- st_transform(nyc_boundaries,  4326)
+
+fdist <- nyc_boundaries |> filter(CounDist == 20)
+
+# Safer selection (Option B)
+inside <- rowSums(st_intersects(tree_points_samp, fdist, sparse = FALSE)) > 0
+flushing_trees <- tree_points_samp[inside, ]
+
+# Color handling with NA-safe logic
+leaflet(flushing_trees) |>
+  addProviderTiles("CartoDB.Positron") |>
+  addPolygons(
+    data = fdist,
+    color = "black", weight = 2, fillColor = "transparent"
+  ) |>
+  addCircleMarkers(
+    radius = 3,
+    color = ~dplyr::case_when(
+      !is.na(tpcondition) & tpcondition == "Dead" ~ "red",
+      TRUE ~ "darkgreen"
+    ),
+    stroke = FALSE, fillOpacity = 0.6,
+    popup = ~paste0(
+      "<b>Species:</b> ", ifelse(is.na(genusspecies), "Unknown", genusspecies),
+      "<br><b>Condition:</b> ", ifelse(is.na(tpcondition), "Unknown", tpcondition)
+    )
+  )
+
 ```
 
 Here is a zoomed-in map of District 20 showing all trees, with dead trees highlighted in red. This project will not only enhance environmental resilience but also improve public safety, reduce heat vulnerability, and turn the neighborhood many call home beautiful. Investing in Flushing’s tree health is an investment in the health and well-being of its residents and the sustainability of the city as a whole.
