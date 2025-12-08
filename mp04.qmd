@@ -1,6 +1,5 @@
 ---
 title: "Mini-Project 04 - Just the Fact(-Check)s, Ma'am!"
-author: "tylerml71"
 editor:
     mode: source
 format:
@@ -360,6 +359,8 @@ CES |>
   kable(format = "html", caption = "Largest Benchmark Revisions (in thousands)")
 
 ```
+
+
 
 ------------------------------------------------------------------------
 
