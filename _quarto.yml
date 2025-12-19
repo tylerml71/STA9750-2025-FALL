@@ -16,9 +16,8 @@ website:
         text: "Mini-Project #03"
       - href: mp04.qmd
         text: "Mini-Project #04"
-      - href: Final-Individual-Report.qmd
         text: "Final Individual Report"
-      - href: NYC_Trees_Tyler_Lara.qmd
+      - href: Final-Individual-Report.qmd
         text: "NYC Tree Slides"
     background: primary
     search: false
