@@ -18,7 +18,6 @@ website:
         text: "Mini-Project #04"
         text: "Final Individual Report"
       - href: Final-Individual-Report.qmd
-        text: "NYC Tree Slides"
     background: primary
     search: false
 format:
