@@ -1,0 +1,924 @@
+---
+title: "How do lower economic indicators correlate with inspection grades given to restaurants"
+editor:
+    mode: source
+format:
+    html:
+      toc: true
+      toc-depth: 3
+      toc-location: left
+      sections: true
+      toc-floating: true
+      code-fold: true
+      code-summary: "Show the code"
+      code-tools:
+          toggle: true
+          source: true
+          caption: "code"
+---
+
+## Introduction
+
+This project was completed by four members including myself. We aimed to answer how restaurant quality relates to community health across NYC neighborhoods. In order to explore every aspect of this question, it was split into four parts for each member. I was tasked with asking the question: ***How do lower economic indicators correlate with inspection grades given to restaurants?*** To answer this question, I pulled some data and went through an in-depth analysis on how impactful some economic indicators can be on Food and Health safety.
+
+## Setup and Cleaning
+
+I will be using 2 of the 3 mentioned datasets in the project, NYC community health profiles and inspection results. There is no reason to include 311 sickness reports, as we are looking at the relation between economic indicators and grades in restaurants. Though, that is another question that could be looked at in the future.
+
+```{r setup}
+#| message: false
+#| warning: false
+library(readxl); library(tibble); library(dplyr)
+library(tidyverse); library(ggplot2); library(reshape2)
+library(lubridate); library(scales); library(janitor)
+library(forcats); library(patchwork); library(scales)
+library(DT); library(glue); library(httr2); library(cowplot);
+library(knitr); library(diptest); library(kableExtra)
+library(GGally);library(arm);library(broom);library(car)
+library(conflicted);library(glmnet)
+conflict_prefer("select", "dplyr")
+conflict_prefer("filter", "dplyr")
+conflicts_prefer(dplyr::recode)
+
+
+
+inspection_df <- function(
+    dest_dir      = file.path("data", "finproj"),
+    filename      = "dohmh_restaurant_inspections.csv",
+    force_refresh = FALSE,
+    guess_max     = 100000,
+    quiet_readr   = TRUE
+) {
+  src_url   <- "https://data.cityofnewyork.us/api/views/43nn-pn8j/rows.csv?accessType=DOWNLOAD"
+  dest_file <- file.path(dest_dir, filename)
+  
+
+  if (!dir.exists(dest_dir)) dir.create(dest_dir, recursive = TRUE)
+  
+
+  needs_download <- !file.exists(dest_file) || isTRUE(force_refresh)
+  
+  if (needs_download) {
+    message(ifelse(force_refresh, "Refreshing file: ", "Downloading: "), src_url)
+    
+
+    resp <- httr2::req_perform(httr2::request(src_url))
+    httr2::resp_check_status(resp)
+    
+    raw <- httr2::resp_body_raw(resp)
+    tmp <- tempfile(fileext = ".csv")
+    readr::write_file(raw, tmp)
+    file.rename(tmp, dest_file)
+    
+    message("File saved to: ", dest_file)
+  } else {
+    message("File already exists in destination: ", dest_file)
+  }
+  
+  df <- readr::read_csv(dest_file,
+                        guess_max = guess_max,
+                        show_col_types = !quiet_readr)
+  
+  if ("INSPECTION DATE" %in% names(df)) {
+    df[["INSPECTION DATE"]] <- suppressWarnings(lubridate::mdy(df[["INSPECTION DATE"]]))
+  }
+  if ("RECORD DATE" %in% names(df)) {
+    df[["RECORD DATE"]] <- suppressWarnings(lubridate::mdy(df[["RECORD DATE"]]))
+  }
+  
+  return(df)
+  
+}
+
+
+
+
+
+
+inspection<- inspection_df()
+
+
+
+
+community_health_df <- function() {
+  # Source url and file names
+  src_url  <- "https://www.nyc.gov/assets/doh/downloads/excel/episrv/2022-chp-pud.xlsx"
+  src_name <- basename(src_url)  
+  
+  # Destination paths
+  dest_dir  <- file.path("data", "finproj")
+  dest_file <- file.path(dest_dir, src_name)
+  
+  if (!dir.exists(dest_dir)) {
+    dir.create(dest_dir, recursive = TRUE)
+  }
+  
+  if (!file.exists(dest_file)) {
+    message("Downloading: ", src_url)
+
+    utils::download.file(src_url, dest_file, mode = "wb", quiet = TRUE)
+    message("File saved to: ", dest_file)
+  } else {
+    message("File already exists in destination: ", dest_file)
+  }
+  
+
+  df <- readxl::read_excel(dest_file, sheet = "CHP_all_data", skip = 1)
+  
+
+  df <- df[-c(66:69), ]
+
+  return(df)
+} 
+  
+
+
+community_health<-community_health_df()
+
+
+format_titles <- function(df) {
+  colnames(df) <- str_replace_all(colnames(df), "_", " ") |> str_to_title()
+  df
+}
+  
+
+
+is_borough_level <- community_health$ID %in% 0:5
+#Bourough rows
+ch_boroughs <- subset(community_health, is_borough_level)|>
+  filter(!(ID=="0"))
+#Community District rows
+ch_neighbor <- subset(community_health, !is_borough_level)
+```
+
+Now that we have setup the code, lets look at the economic indicators we will be using. The measure Rent Burden is classified as the percentage of renter-occupied homes whose gross rent is equal or greater than 30 percent of household income in the past 12 months. The measure unemployment is the Percentage of civilian labor force that are 16 and older, and unemployed. Finally, poverty is the percentage of residents living below 100% of New York City’s calculated poverty threshold based on income and necessary expenses. All of these are important indicators for how well people are doing financially each area. The idea is that if rent is expensive, unemployment is high, and/or poverty is high, people are less likely to buy food from restaurants. This in turn would lead restaurants to have less income to spend on food compliance and thus lower their grade on the next inspection. Below is a sample of the data we will be working with.
+
+```{r}
+ch_neighbor|> 
+  select(
+    Name,
+    Poverty,
+    Rent_Burden,
+    Unemployment
+  )|>
+  mutate(
+    across(
+      c(Poverty, Rent_Burden, Unemployment),
+      ~ label_percent(accuracy = 0.1, scale = 1)(.x)
+    )
+  )|>
+  format_titles()|>
+  slice_sample(n=20)|>
+  datatable(rownames = FALSE, 
+            options= list(
+              pagelength=5, 
+              lengthMenu = c(5, 10, 15, 20)
+            )
+  )
+
+
+```
+
+When looking at inspection data, I found that there were restaurants that were repeated multiple times, and on the same day. Not only this, but grades with Na's and other letters (like N for "Not Yet Graded") were present. This is because each individual violation is recorded and noted if it is critically important or not. While this would be helpful for answering other questions in this project like the amount of critical flags in a district, it isn't here. Having repeats of the same grade and non-grading letters can drastically warp our findings.
+
+```{r}
+
+inspection|>
+  clean_names()|>
+  get_dupes(camis, inspection_date)|>
+  filter(!is.na(grade))|>
+  slice_head(n=30)|>
+  select(name=dba, critical_flag, inspection_date, grade)|>
+  format_titles()|>
+  datatable(rownames = FALSE, 
+            options= list(
+              pagelength=5, 
+              lengthMenu = c(5, 10, 15, 20)
+            )
+  )
+
+```
+
+To make sure this dataset can join with community health, we added district/neighborhood groups based on the zip code. Mutating to an ID and joining it is definitely the optimal and safe option, but the amount of rows in the community health dataset is relatively small. This means we can copy the exact name of the area from the dataset and put it in this code. Now that the data is cleaned, we can move on to the next step.
+
+```{r }
+inspection_cleaned <- inspection |>
+  clean_names()|>
+  mutate(
+    neighborhood_group = case_when(
+      zipcode %in% c(10031, 10032, 10033, 10034, 10040) ~ "Washington Heights and Inwood",
+      zipcode %in% c(10026, 10030, 10037, 10039) ~ "Central Harlem",
+      zipcode %in% c(10029, 10035) ~ "East Harlem",
+      zipcode %in% c(10023, 10024) ~ "Upper West Side",
+      zipcode %in% c(10021, 10028, 10044, 10065, 10075, 10128) ~ "Upper East Side",
+      zipcode %in% c(10001, 10011, 10018, 10019, 10020, 10036) ~ "Clinton and Chelsea",
+      zipcode %in% c(10010, 10016, 10017, 10022) ~ "Stuyvesant Town and Turtle Bay",
+      zipcode %in% c(10012, 10013, 10014) ~ "Greenwich Village and Soho",
+      zipcode %in% c(10002, 10003, 10009) ~ "Lower East Side and Chinatown",
+      zipcode %in% c(10004, 10005, 10006, 10007, 10038, 10280) ~ "Financial District",
+      zipcode %in% c(10025, 10027) ~ "Morningside Heights and Hamilton Heights",
+      
+      zipcode %in% c(10301, 10302, 10303, 10304, 10305, 10310) ~ "St. George and Stapleton",
+      zipcode %in% c(10306, 10314) ~ "South Beach and Willowbrook",
+      zipcode %in% c(10307, 10308, 10309, 10312) ~ "Tottenville and Great Kills",
+      
+      zipcode %in% c(10451, 10454, 10455, 10456, 10459) ~ "Mott Haven and Melrose",
+      zipcode %in% c(10474, 10475) ~ "Hunts Point and Longwood",
+      zipcode %in% c(10453, 10457, 10458, 10460) ~ "Morrisania and Crotona",
+      zipcode %in% c(10452, 10456, 10451) ~ "Highbridge and Concourse",
+      zipcode %in% c(10453, 10458, 10467, 10468) ~ "Fordham and University Heights",
+      zipcode %in% c(10457, 10458, 10461) ~ "Belmont and East Tremont",
+      zipcode %in% c(10463, 10471) ~ "Kingsbridge Heights and Bedford",
+      zipcode %in% c(10463, 10471) ~ "Riverdale and Fieldston",
+      zipcode %in% c(10462, 10473) ~ "Parkchester and Soundview",
+      zipcode %in% c(10461, 10465, 10472, 10473) ~ "Throgs Neck and Co-op City",
+      zipcode %in% c(10461, 10462) ~ "Morris Park and Bronxdale",
+      zipcode %in% c(10466, 10467, 10469) ~ "Williamsbridge and Baychester",
+      
+      zipcode %in% c(11211, 11222) ~ "Greenpoint and Williamsburg",
+      zipcode %in% c(11201, 11205) ~ "Fort Greene and Brooklyn Heights",
+      zipcode %in% c(11206, 11216, 11221, 11233, 11238) ~ "Bedford Stuyvesant",
+      zipcode %in% c(11207, 11221, 11237) ~ "Bushwick",
+      zipcode %in% c(11207, 11208) ~ "East New York and Starrett City",
+      zipcode %in% c(11215, 11217, 11231) ~ "Park Slope and Carroll Gardens",
+      zipcode %in% c(11220, 11232) ~ "Sunset Park",
+      zipcode %in% c(11213, 11216, 11225, 11238) ~ "Crown Heights and Prospect Heights",
+      zipcode %in% c(11203, 11212) ~ "South Crown Heights and Lefferts Gardens",
+      zipcode %in% c(11209, 11220) ~ "Bay Ridge and Dyker Heights",
+      zipcode %in% c(11204, 11214, 11228) ~ "Bensonhurst",
+      zipcode %in% c(11204, 11218, 11219, 11230) ~ "borough Park",
+      zipcode %in% c(11224) ~ "Coney Island",
+      zipcode %in% c(11203, 11210, 11226) ~ "Flatbush and Midwood",
+      zipcode %in% c(11235) ~ "Sheepshead Bay",
+      zipcode %in% c(11212, 11233) ~ "Brownsville",
+      zipcode %in% c(11203, 11226, 11230) ~ "East Flatbush",
+      zipcode %in% c(11236, 11234) ~ "Flatlands and Canarsie",
+      
+      zipcode %in% c(11101, 11102, 11103, 11104, 11105, 11106, 11369, 11370, 11377) ~ "Long Island City and Astoria",
+      zipcode %in% c(11377, 11378, 11379) ~ "Woodside and Sunnyside",
+      zipcode %in% c(11372, 11373, 11374) ~ "Jackson Heights",
+      zipcode %in% c(11373, 11375, 11368) ~ "Elmhurst and Corona",
+      zipcode %in% c(11385, 11378) ~ "Ridgewood and Maspeth",
+      zipcode %in% c(11374, 11375, 11385) ~ "Rego Park and Forest Hills",
+      zipcode %in% c(11354, 11355, 11356, 11357, 11358) ~ "Flushing and Whitestone",
+      zipcode %in% c(11365, 11366, 11367) ~ "Hillcrest and Fresh Meadows",
+      zipcode %in% c(11415, 11416, 11421) ~ "Kew Gardens and Woodhaven",
+      zipcode %in% c(11417, 11419, 11420) ~ "South Ozone Park and Howard Beach",
+      zipcode %in% c(11360, 11361, 11362) ~ "Bayside and Little Neck",
+      zipcode %in% c(11412, 11423, 11432, 11433, 11434) ~ "Jamaica and Hollis",
+      zipcode %in% c(11427, 11428, 11429) ~ "Queens Village",
+      zipcode %in% c(11691, 11692, 11693, 11694, 11695) ~ "Rockaway and Broad Channel",
+      TRUE ~ NA_character_
+    )
+  )|>
+  distinct(pick(camis, inspection_date), .keep_all=TRUE)|>
+  filter(grade %in% c("A","B","C"), year(inspection_date)>= 2021 
+         & year(inspection_date)<= 2025 )|>
+  mutate(inspection_date= as.Date(inspection_date, format = "%m/%d/%Y"),
+         grade_date= as.Date(inspection_date, format = "%m/%d/%Y")
+         )
+
+ch_neighbor<- ch_neighbor|>
+  mutate(across(where(is.character), ~ na_if(., "n/a")))|>
+  clean_names()
+
+
+combined_df <- inspection_cleaned|>
+  left_join(ch_neighbor, 
+            by = c("neighborhood_group" = "name"))|>
+  rename(name=neighborhood_group)|>
+  select(
+    name, id,
+    poverty, unemployment, rent_burden,
+    grade, score, grade_date,
+    inspection_date,borough)
+
+```
+
+::: callout-note
+I also separated IDs 0-5 from community_health, those IDs specifically show borough and city wide data. It might be used later, so it is split into a separate dataset for now.
+:::
+
+## Exploratory Data Analysis (EDA)
+
+I began with some exploratory data analysis to understand the socioeconomic indicators at the district level. I gave histograms a mean reference line to assess the central tendency, spread, and skewedness of the data. There is some moderate variation in poverty and rent burden, and a right skewedness in unemployment. Unemployment also is the only one that has an outlier in the box plot, being around 13%.
+
+```{r}
+#| fig-height: 3
+#| fig-width: 10
+#| out-width: 100%
+#| fig-show: hold
+
+
+
+ch_plot <- ch_neighbor |>
+  mutate(across(where(is.character), ~ na_if(.x, "n/a"))) |>
+  select(poverty,
+         rent_burden,
+         unemployment) |>
+  format_titles()
+
+
+indicators <- c("Poverty","Rent Burden","Unemployment" )
+
+
+plot_list <- lapply(indicators, function(v) {
+  bw <- if (v == "Unemployment") 1 else 2
+  ggplot(ch_plot, aes(x = .data[[v]])) +
+    geom_histogram(binwidth = bw, fill = "#4E79A7", color = "white") +
+    geom_vline(
+      aes(xintercept = median(.data[[v]], na.rm = TRUE)),
+      linetype = "dashed", color = "red"
+    ) +
+    labs(title = v, x = "%", y = "Districts") +
+    theme_minimal(base_size = 11) +
+    theme(
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.minor.y = element_blank()
+    )
+})
+
+
+
+plot_list2 <- lapply(indicators, function(v) {
+  ggplot(ch_plot, aes(x = .data[[v]])) +
+    geom_boxplot(fill = "#4E79A7") +
+    labs(title = v, x = "%", y = NULL) +
+    theme_minimal(base_size = 11) +
+    theme(
+      axis.title.y = element_blank(),
+      axis.text.y  = element_blank(),
+      axis.ticks.y = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank()
+       )
+})
+
+wrap_plots(plot_list, nrow = 1)
+wrap_plots(plot_list2, nrow = 1)
+```
+
+Rent burden and unemployment did not look unimodal, so to see if they are unimodal I conducted the Hartigan's Dip test. It indicated poverty and rent burden are consistent with unimodal distributions. However, Unemployment's test is significant, meaning it indicates significant bimodality. This is likely because of the few districts with a high unemployment rate. I also wanted to use density plots to check if these indicators have similar shapes or different patterns, which can help with deciding a good fitting model. Again, Unemployment seems to re-occur with skewedness and a decently heavy tail, causing this unimodality.
+
+```{r}
+#| results: hold
+long <- ch_plot |>
+  tidyr::pivot_longer(cols = c(Poverty, `Rent Burden`, Unemployment),
+                      names_to = "indicator", values_to = "value")
+res <- long |>
+  group_by(indicator) |>
+  summarise(
+    p_value = dip.test(value[!is.na(value)])$p.value,
+    .groups = "drop"
+  ) |>
+  arrange(p_value)
+
+
+
+
+long|>
+  ggplot( aes(value, fill = indicator)) +
+  geom_density(alpha = 0.35, adjust = 1.0) +
+  facet_wrap(~ indicator, scales = "free") +
+  labs(x = "%", y = "Density")+
+  theme_light()
+
+
+res|>
+  knitr::kable(
+    format = "html",
+    digits = 5,
+    col.names = c("Indicator", "Dip test p-value"),
+    align = c("l","c"),
+    table.attr = "style='width:420px; margin-left:auto; margin-right:auto;'"
+  ) |>
+  kable_styling(full_width = FALSE, position = "center",
+                            bootstrap_options = c("condensed"))
+
+```
+
+```{html}
+table.table {   width: auto !important;   margin-left: auto;   margin-right: auto; }
+```
+
+Finally, I wanted to test if there was a correlation between these three variables. This is important because if the predictors have low/moderate correlation, a model with these variables could be more accurate. But if they are too high, these correlations could make the coefficients unstable and the model unreliable. Looking at the pair plots, rent burden and unemployment have the lowest correlation, but still moderately high at 0.62. All three pairs have upward trends, and the cloud of points are fairly linear with some spread.
+
+```{r}
+
+GGally::ggpairs(
+  ch_plot,
+  columns = c("Poverty","Rent Burden","Unemployment"),
+  upper = list(continuous = GGally::wrap("cor", size = 4)),
+  lower = list(continuous = GGally::wrap("points", alpha = 0.7, size = 1.8)),
+  diag  = list(continuous = GGally::wrap("blankDiag"))
+)
+
+
+
+```
+
+## Model building and Validation
+
+### Initial Modeling
+
+The first model I tried was a single variable model for all 3 Grades (A, B, and C), using each socioeconomic variable on its own. While these simple linear regression fits are useful to see the general relationships, the indicators are moderately to highly correlated to each other. Its likely that rent burned, unemployment, and poverty each contribute signal to grade outcomes. Modeling them jointly or through a composite index would probably get the pattern more reliable than a single variable. Just to make sure, I began with simple scatter plots and gave regression lines by grade. Grade A's given to restaurant generally decreases as economic stress increases, and grade B tends to rise. Grade c shows a smaller increase, but its much noisier.
+
+```{r}
+#| fig-show: hold
+#| fig-height: 3
+#| fig-width: 10
+#| out-width: 100%
+#| message: false
+
+grades<- combined_df|>
+  filter(year(inspection_date)>= 2021 & year(inspection_date)<= 2025 )|>
+  group_by(id)|>
+  summarise(
+    total_restaurants = n(),
+    grade_A_count = sum(grade == "A"),
+    grade_B_count = sum(grade == "B"),
+    grade_C_count = sum(grade == "C"),
+    avg_score = mean(score, na.rm = TRUE)
+  )|>
+  filter(!is.na(id))|>
+  mutate(pct_grade_A = grade_A_count / total_restaurants,
+         pct_grade_B = grade_B_count / total_restaurants,
+         pct_grade_C = grade_C_count / total_restaurants,
+         nonA_count = total_restaurants - grade_A_count
+  )|>
+  inner_join(combined_df, by = c("id"))|>
+  mutate(
+    rent_burden_z = scale(rent_burden)[,1],
+    poverty_z     = scale(poverty)[,1],
+    unemployment_z = scale(unemployment)[,1]
+  )|>
+  distinct(id, .keep_all = TRUE)|>
+  select(-grade, - score, -grade_date)
+
+grades_long<- grades |>
+  select(rent_burden, poverty, unemployment, pct_grade_A, pct_grade_B, pct_grade_C) |>
+  pivot_longer(
+    cols = starts_with("pct_grade_"),
+    names_to = "grade",
+    values_to = "pct"
+  ) |>
+  mutate(
+    grade = dplyr::recode(grade,
+                   "pct_grade_A" = "Grade A",
+                   "pct_grade_B" = "Grade B",
+                   "pct_grade_C" = "Grade C")
+  )
+
+grades_long |>
+  ggplot(aes(x = rent_burden, y = pct)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "Rent Burden vs % Grade",
+    x = "% Rent Burden",
+    y = "% of Grade"
+  ) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  facet_wrap(~ grade, ncol = 3, scales = "free_y") +   
+  theme_minimal()
+
+
+grades_long |>
+  ggplot(aes(x= poverty, y= pct))+
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red")+
+  labs(title ="poverty vs % Grade ", 
+       x = "% poverty", 
+       y = "% of Grade")+
+  scale_y_continuous(labels = percent_format(accuracy = 1))+
+  facet_wrap(~ grade, ncol = 3, scales = "free_y") +
+  theme_minimal()
+
+grades_long |>
+  ggplot(aes(x = unemployment, y = pct)) +
+  geom_point(color = "darkgreen") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "Rent Burden vs % Grade",
+    x = "% Rent Burden",
+    y = "% of Grade"
+  ) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  facet_wrap(~ grade, ncol = 3, scales = "free_y") +   
+  theme_minimal()
+
+
+
+
+
+```
+
+### Further Modeling and Validation
+
+decided to move on from single variables, so I constructed two citywide indices that summarize economic stress per district. The Equal weight Z index (EZI) standardizes each indicator to a z-score and averages them. A **higher** EZI essentially means **more economic stress** by an equal fraction of rent, poverty, and unemployment. I also built a Supervised Logistic Index (SLI) by fitting a binomial model for A versus non-A percentages on 3 z-scores, and used the coefficients as weights. Because SLI's weights are chosen to best predict the outcome, it tends to be more predictive. The orientation is different however, a **higher** SLI leads to **less economic stress** and/or a **higher predicted percentage** **of A's** because the direction is set by the learned weights.
+
+```{r}
+#|results: hold
+
+
+district_metrics <- ch_neighbor |>
+  select(id, rent_burden, poverty, unemployment) |>
+  mutate(
+    rent_z = as.numeric(scale(rent_burden)),
+    pov_z  = as.numeric(scale(poverty)),
+    un_z   = as.numeric(scale(unemployment)),
+    EZI    = (rent_z + pov_z + un_z) / 3,
+    EZI_z  = as.numeric(scale(EZI)),
+    EZI_100 = scales::rescale(EZI, to = c(0, 100))
+  )
+
+
+df_idx <- grades |>
+  left_join(
+    district_metrics |> select(id, EZI_z, EZI_100, rent_z, pov_z, un_z),
+    by = "id"
+  )
+
+
+m_sli_weights <- glm(
+  cbind(grade_A_count, total_restaurants - grade_A_count) ~ rent_z + pov_z + un_z,
+  data = df_idx, family = binomial
+)
+
+
+w <- coef(m_sli_weights)[c("rent_z","pov_z","un_z")]
+
+
+df_idx <- df_idx |>
+  mutate(
+    SLI_raw = w["rent_z"]*rent_z + w["pov_z"]*pov_z + w["un_z"]*un_z,
+    SLI_z   = as.numeric(scale(SLI_raw)),
+    SLI_100 = scales::rescale(SLI_raw, to = c(0, 100))
+  )
+
+
+
+```
+
+All grade models were fit as binomial GLMs using district‑level counts (e.g., `cbind(A_count, total – A_count)`), which weights by district size and yields predictions on the probability scale, the percentage of restaurants. For each grade, I estimated multiple things, the first being univariate models for rent, poverty, and unemployment and the second a multiple model with all three indicators. Finally, I estimated multiple index‑based models with EZI or SLI alone. I then compared fits using AIC and McFadden’s pseudo‑R² . The comparison table shows a fairly consistent pattern. For Grade A, the SLI and multiple models deliver the best performance (AIC around 514–518 and R² ≈ 0.46), substantially improving on the EZI model (AIC ≈ 559, R² ≈ 0.33) and far outperforming unemployment alone (AIC ≈ 637, R² ≈ 0.11). For Grade B, the multiple specification stands out with an of AIC ≈ 427 and R² ≈ 0.51. Rent and poverty univariates are close behind, while the index models trail but still have most of the effect. Grade C generally follows B’s pattern but again has a weaker signal and wider uncertainty, so I am uncertain if Grade C will have significance in any of these models.
+
+```{r}
+#| results: hold
+
+fit_binom <- function(df, grade = c("A","B","C"), rhs) {
+  grade <- match.arg(grade)
+  y_s <- switch(grade,
+                A = df$grade_A_count,
+                B = df$grade_B_count,
+                C = df$grade_C_count)
+  y_f <- df$total_restaurants - y_s
+  glm(cbind(y_s, y_f) ~ ., data = cbind.data.frame(rhs, y_s, y_f),
+      family = binomial)
+}
+
+# Predictor sets
+rhs_ezi   <- df_idx |> select(EZI_z)
+rhs_sli   <- df_idx |> select(SLI_z)
+rhs_uni_rb<- df_idx |> select(rent_z)
+rhs_uni_p <- df_idx |> select(pov_z)
+rhs_uni_u <- df_idx |> select(un_z)
+rhs_multi <- df_idx |> select(rent_z, pov_z, un_z)
+
+
+mods <- list(
+
+  A_ezi   = fit_binom(df_idx, "A", rhs_ezi),
+  A_sli   = fit_binom(df_idx, "A", rhs_sli),
+  A_rb    = fit_binom(df_idx, "A", rhs_uni_rb),
+  A_pov   = fit_binom(df_idx, "A", rhs_uni_p),
+  A_un    = fit_binom(df_idx, "A", rhs_uni_u),
+  A_multi = fit_binom(df_idx, "A", rhs_multi),
+
+
+  B_ezi   = fit_binom(df_idx, "B", rhs_ezi),
+  B_sli   = fit_binom(df_idx, "B", rhs_sli),
+  B_rb    = fit_binom(df_idx, "B", rhs_uni_rb),
+  B_pov   = fit_binom(df_idx, "B", rhs_uni_p),
+  B_un    = fit_binom(df_idx, "B", rhs_uni_u),
+  B_multi = fit_binom(df_idx, "B", rhs_multi),
+
+
+  C_ezi   = fit_binom(df_idx, "C", rhs_ezi),
+  C_sli   = fit_binom(df_idx, "C", rhs_sli),
+  C_rb    = fit_binom(df_idx, "C", rhs_uni_rb),
+  C_pov   = fit_binom(df_idx, "C", rhs_uni_p),
+  C_un    = fit_binom(df_idx, "C", rhs_uni_u),
+  C_multi = fit_binom(df_idx, "C", rhs_multi)
+)
+
+
+pseudoR2 <- function(m) 1 - (m$deviance / m$null.deviance)
+
+model_summary <- tibble::tibble(
+  model = names(mods),
+  AIC   = sapply(mods, AIC),
+  McFadden_R2 = sapply(mods, pseudoR2)
+) |>
+  arrange(model)
+
+
+
+model_summary<- model_summary |>
+  mutate(
+    grade = str_extract(model, "^[ABC]"),
+    spec  = str_replace(model, "^[ABC]_","")
+  ) |>
+  mutate(
+    grade = recode(grade,
+      "A" = "Grade A",
+      "B" = "Grade B",
+      "C" = "Grade C"
+    ),
+    spec = recode(spec,
+      "ezi"   = "EZI (equal‑weight index)",
+      "sli"   = "SLI (supervised index)",
+      "multi" = "Multiple (rent + poverty + unemployment)",
+      "rb"    = "Rent burden only",
+      "pov"   = "Poverty only",
+      "un"    = "Unemployment only"
+    )
+   ) |>
+  select(grade, spec, AIC, McFadden_R2) |>
+  arrange(grade, AIC)
+
+
+
+
+aic_wide <- model_summary |>
+  select(grade, spec, AIC) |>
+  pivot_wider(names_from = grade, values_from = AIC)
+
+
+r2_wide <- model_summary |>
+  select(grade, spec, McFadden_R2) |>
+  pivot_wider(names_from = grade, values_from = McFadden_R2)
+
+
+kbl(aic_wide, caption = "AIC Model comparison", digits = c(NA, 3, 3, 3))|> 
+  kable_styling(full_width = FALSE, 
+                bootstrap_options = c("striped","condensed"))
+                
+kbl(r2_wide, caption = "McFadden R² Model comparison", digits = c(NA, 3, 3, 3))|> 
+  kable_styling(full_width = FALSE, 
+                bootstrap_options = c("striped","condensed"))
+
+
+
+```
+
+### Plotting the Model
+
+I wanted to show a plot that might be easier to interpret, though that is always hard to do with z-scores. Its an unfortunate situation where the model calls for either z-scores, logistic scaling, or some other transformation so it wont have multicollinearity. I plotted citywide prediction curves for EZI and SLI with 95% confidence bands on the response scale. The EZI plot shows a clear trade‑off: as stress rises, the share of A‑grade restaurants declines steadily, while B and C both increase (B more than C). The SLI plot shows the mirror image because SLI was learned from A where moving “up” the SLI scale (less stress / stronger A signal) raises A and lowers grade B and grade C. EZI is a bit easier easy to explain, while SLI is optimized for prediction and matches the grade distribution much better.
+
+```{r}
+#| fig-show: hold
+
+x_seq <- seq(min(df_idx$EZI_z, na.rm = TRUE),
+             max(df_idx$EZI_z, na.rm = TRUE), length.out = 300)
+pred_df <- data.frame(EZI_z = x_seq)
+
+# Binomial predictions and CIs
+pred_A <- predict(mods$A_ezi, newdata = pred_df, type = "link", se.fit = TRUE)
+pred_B <- predict(mods$B_ezi, newdata = pred_df, type = "link", se.fit = TRUE)
+pred_C <- predict(mods$C_ezi, newdata = pred_df, type = "link", se.fit = TRUE)
+
+plot_curves <- tibble::tibble(
+  EZI_z = x_seq,
+  A_hat = plogis(pred_A$fit),
+  A_lwr = plogis(pred_A$fit - 1.96 * pred_A$se.fit),
+  A_upr = plogis(pred_A$fit + 1.96 * pred_A$se.fit),
+  B_hat = plogis(pred_B$fit),
+  B_lwr = plogis(pred_B$fit - 1.96 * pred_B$se.fit),
+  B_upr = plogis(pred_B$fit + 1.96 * pred_B$se.fit),
+  C_hat = plogis(pred_C$fit),
+  C_lwr = plogis(pred_C$fit - 1.96 * pred_C$se.fit),
+  C_upr = plogis(pred_C$fit + 1.96 * pred_C$se.fit)
+) |>
+  pivot_longer(cols = -EZI_z,
+               names_to = c("grade","stat"),
+               names_sep = "_",
+               values_to = "value") |>
+  pivot_wider(names_from = stat, values_from = value)
+
+
+plot_curves_faceted <- plot_curves |>
+  mutate(
+    grade = factor(grade, levels = c("A","B","C"),
+                   labels = c("Grade A","Grade B","Grade C"))
+  )
+
+
+
+plot_curves_faceted|>
+  ggplot(aes(EZI_z, hat)) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr, fill = grade), alpha = 0.20) +
+  geom_line(aes(color = grade), linewidth = 1.2) +
+  facet_wrap(~ grade, ncol = 3, scales = "free_y") +
+  scale_color_manual(values = c("Grade A" = "#2C7FB8",
+                                "Grade B" = "#F28E2B",
+                                "Grade C" = "#E15759")) +
+  scale_fill_manual(values = c("Grade A" = "#2C7FB8",
+                               "Grade B" = "#F28E2B",
+                               "Grade C" = "#E15759")) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  labs(
+    title = "Citywide predicted share by grade vs Economic Stress (EZI)",
+    subtitle = "One panel per grade; shaded bands are 95% CIs",
+    x = "EZI (z-score across districts)",
+    y = "% of restaurants"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none")
+
+
+
+# SLI
+x_seq <- seq(min(df_idx$SLI_z , na.rm = TRUE),
+             max(df_idx$SLI_z , na.rm = TRUE), length.out = 300)
+pred_df <- data.frame(SLI_z  = x_seq)
+
+
+pred_A <- predict(mods$A_sli, newdata = pred_df, type = "link", se.fit = TRUE)
+pred_B <- predict(mods$B_sli, newdata = pred_df, type = "link", se.fit = TRUE)
+pred_C <- predict(mods$C_sli, newdata = pred_df, type = "link", se.fit = TRUE)
+
+plot_curves2 <- tibble::tibble(
+  SLI_z  = x_seq,
+  A_hat = plogis(pred_A$fit),
+  A_lwr = plogis(pred_A$fit - 1.96 * pred_A$se.fit),
+  A_upr = plogis(pred_A$fit + 1.96 * pred_A$se.fit),
+  B_hat = plogis(pred_B$fit),
+  B_lwr = plogis(pred_B$fit - 1.96 * pred_B$se.fit),
+  B_upr = plogis(pred_B$fit + 1.96 * pred_B$se.fit),
+  C_hat = plogis(pred_C$fit),
+  C_lwr = plogis(pred_C$fit - 1.96 * pred_C$se.fit),
+  C_upr = plogis(pred_C$fit + 1.96 * pred_C$se.fit)
+) |>
+  pivot_longer(cols = -SLI_z ,
+               names_to = c("grade","stat"),
+               names_sep = "_",
+               values_to = "value") |>
+  pivot_wider(names_from = stat, values_from = value)
+
+
+plot_curves_faceted2 <- plot_curves2 |>
+  mutate(
+    grade = factor(grade, levels = c("A","B","C"),
+                   labels = c("Grade A","Grade B","Grade C"))
+  )
+
+plot_curves_faceted2|>
+  ggplot(aes(SLI_z , hat)) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr, fill = grade), alpha = 0.20) +
+  geom_line(aes(color = grade), linewidth = 1.2) +
+  facet_wrap(~ grade, ncol = 3, scales = "free_y") +
+  scale_color_manual(values = c("Grade A" = "#2C7FB8",
+                                "Grade B" = "#F28E2B",
+                                "Grade C" = "#E15759")) +
+  scale_fill_manual(values = c("Grade A" = "#2C7FB8",
+                               "Grade B" = "#F28E2B",
+                               "Grade C" = "#E15759")) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  labs(
+    title = "Citywide predicted share by grade vs Economic Stress (SLI)",
+    subtitle = "Single curves per grade; shaded bands are 95% CIs",
+    x = "SLI (z-score across districts)",
+    y = "% of restaurants"
+  )+
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none")
+
+
+```
+
+Across grades, the index specifications (EZI and SLI) yield statistically meaningful effects, while the multiple model’s individual indicators are noisier and largely non‑significant. In the Grade A model, a 1‑SD increase in EZI (more economic stress) is associated with a decrease in the log‑odds of receiving Grade A (β = −0.148, *p* ≈ 0). Conversely, a 1‑SD increase in SLI (less stress/higher predicted A) is positive (β = 0.163, *p* ≈ 0). The multiple model’s rent burden, poverty, and unemployment terms are individually non‑significant for Grade A. For Grade B, the pattern mirrors Grade A: EZI is positive (β = 0.161, SE = 0.029, *z* = 5.59, *p* ≈ 0) and SLI is negative (β = −0.173, *p* ≈ 0), while separate rent, poverty, and unemployment terms do not reach significance. Finally, for Grade C, the signal is weaker but directionally consistent: EZI is positive (β = 0.095, *p* = 0.00149) and SLI is negative (β = −0.115, *p* = 0.00281). The multiple model’s three indicators again appear individually non‑significant.
+
+```{r}
+
+#| results: hold
+library(lmtest)
+library(sandwich)
+
+
+tidy_wald <- function(mod, terms = NULL, robust = TRUE, type = "HC1") {
+  est <- coef(mod)
+  # robust vs classical variance-covariance
+  V   <- if (robust) sandwich::vcovHC(mod, type = type) else vcov(mod)
+  se  <- sqrt(diag(V))
+  z   <- est / se
+  p   <- 2 * pnorm(abs(z), lower.tail = FALSE)
+  
+  out <- tibble::tibble(
+    term      = names(est),
+    estimate  = as.numeric(est),
+    std.error = as.numeric(se),
+    statistic = as.numeric(z),
+    p.value   = as.numeric(p)
+  )
+  if (!is.null(terms)) out <- dplyr::filter(out, term %in% terms)
+  out
+}
+
+# Helper: safely pull one term; returns empty tibble if missing
+tidy_wald_term <- function(mod, term, robust = TRUE, type = "HC1") {
+  res <- tidy_wald(mod, robust = robust, type = type)
+  dplyr::filter(res, .data$term == term)
+}
+
+
+# EZI_z for A/B/C
+p_ezi <- bind_rows(
+  tidy_wald_term(mods$A_ezi, "EZI_z") |> 
+    mutate(grade = "Grade A", spec = "EZI"),
+  tidy_wald_term(mods$B_ezi, "EZI_z") |> 
+    mutate(grade = "Grade B", spec = "EZI"),
+  tidy_wald_term(mods$C_ezi, "EZI_z") |> 
+    mutate(grade = "Grade C", spec = "EZI")
+)
+
+# SLI_z for A/B/C
+p_sli <- bind_rows(
+  tidy_wald_term(mods$A_sli, "SLI_z") |> 
+    mutate(grade = "Grade A", spec = "SLI"),
+  tidy_wald_term(mods$B_sli, "SLI_z") |> 
+    mutate(grade = "Grade B", spec = "SLI"),
+  tidy_wald_term(mods$C_sli, "SLI_z") |> 
+    mutate(grade = "Grade C", spec = "SLI")
+  )
+
+
+
+p_multi <- bind_rows(
+  tidy_wald(mods$A_multi, terms = c("rent_z","pov_z","un_z")) %>% 
+    mutate(grade = "Grade A", spec = "Multiple"),
+  tidy_wald(mods$B_multi, terms = c("rent_z","pov_z","un_z")) %>% 
+    mutate(grade = "Grade B", spec = "Multiple"),
+  tidy_wald(mods$C_multi, terms = c("rent_z","pov_z","un_z")) %>% 
+    mutate(grade = "Grade C", spec = "Multiple"))
+  
+
+
+p_all <- bind_rows(p_ezi, p_sli, p_multi) %>%
+  select(grade, spec, term, estimate, std.error, statistic, p.value) %>%
+  mutate(
+    estimate  = round(estimate, 3),
+    std.error = round(std.error, 3),
+    statistic = round(statistic, 3),
+    p.value   = signif(p.value, 3)   # or round(p.value, 3)
+  ) %>%
+  arrange(grade, spec, term)
+
+
+p_all |>
+  filter(term != "(Intercept)") |>
+  mutate(
+    spec = recode(spec,
+      "EZI"     = "EZI (equal-weight index)",
+      "SLI"     = "SLI (supervised index)",
+      "Multiple"= "Multiple (rent + poverty + unemployment)"
+    ),
+    term = recode(term,
+      "EZI_z" = "EZI (per 1 SD)",
+      "SLI_z" = "SLI (per 1 SD)",
+      "rent_z"= "Rent burden (per 1 SD)",
+      "pov_z" = "Poverty (per 1 SD)",
+      "un_z"  = "Unemployment (per 1 SD)"
+    ),
+    estimate  = round(estimate, 3),
+    std.error = round(std.error, 3),
+    statistic = round(statistic, 3),
+    p.value   = signif(p.value, 3)
+  ) |>
+  arrange(grade, spec, term)|>
+  kbl(
+    col.names = c("Grade","Model","Term","Estimate",
+                  "SE (robust)","z","p-value"),
+    align = c("l","l","l","r","r","r","r"),
+    caption = "Per-coefficient Wald tests (HC1 robust SEs)"
+  ) |>
+  kable_styling(full_width = FALSE, 
+                bootstrap_options = c("striped","condensed")) |>
+  collapse_rows(columns = 1, valign = "top")
+
+
+```
+
+While coefficients are reported on the log‑odds scale, I want to convey is that there is movement in the likelyhood of grades changing as neighborhood stress shifts. For example, with Grade A the EZI effect (β = −0.148) translates to an odds ratio of approximately 0.86, which is about a 14% reduction in the odds of an A for a one‑SD increase in stress. If a district is at roughly 60% A’s to begin with, a single standard deviation increase corresponds to a change of about −3 to −4 percentage points.
+
+On the other hand, the SLI effect (β = 0.163) moves in the opposite direction and is of similar magnitude, raising the odds of A by \~18% and typically adding around +3 percentage points when the baseline is near the middle of the probability range. This basically means there is more movement in the middle, less at the extremes, which is pretty expected for logistic models, because probability changes are largest when the baseline is neither very low nor very high. The same logic applies over to Grade B and Grade C. For Grade B, EZI’s positive coefficient means B becomes more common as stress increases, while SLI’s negative coefficient means B recedes as SLI increases. Grade C shows much smaller in the same directions. The best way to understand this is like a see-saw: pushing up stress tilts the distribution away from A and toward B & C, while raising SLI tilts it back toward A again. The tight confidence bands for A and B suggest a stable citywide relationship rather than noise in a handful of districts. While the model is significant for C, the variance and the confidence band is significantly large. Its likely that economic stress does not affect how common Cs are given out.
+
+## Conclusions
+
+The aim for this subset study was to understand how lower economic indicators impact the type of inspection grade given out. Throughout this study, we have gone over multiple significant evidence from the EDA, index construction, and tests all pointing to an answer. That being districts with increasing economic stress tend to show fewer A grades and more B (with some C) grades. This is especially clear when an index is used because people that are unemployed are likely to be in poverty, and if their income is low (i.e. being in the poverty level), their rent burden is likely to be high as well.
+
+There is a solution for this, and its really simple. Districts that have high economic stress should receive both economic and compliance support. Providing training, food safety materials, and small grants for repairs or upgrades to outdated equipment will go a long way in reducing the amount of restaurants not being able to comply with food safety standards. A two to four percentage point shift in grade A might sound like a small amount, but when we live in a city with tens of thousands of restaurants that can add up to a significant number. If the top quarterly of restaurants in the EZI were brought down by even half a standard deviation, there would be a large increase of A's and thus a reductions in B's. It would lead to fewer borderline cases, likely less incidents with food poisoning, and overall help communities' economic and physical health.
+
+## Potential Next steps
+
+This study was done with 2 index models and 3 indicator variables. Additional covariates like the highest level of education achieved, Gentrification, or Homes reporting cockroaches could be implemented into these models. Additionally, testing other models like an unsupervised indices (PCA scores) against SLI and EZI could be done to see what model fits best. There could be other questions that stem from this such as how do index effects differ across boroughs, or even districts? Exploring further would help build a solid case to build a policy on supporting restaurants in lower economic areas.
