@@ -35,7 +35,7 @@ library(forcats); library(patchwork); library(scales)
 library(DT); library(glue); library(httr2); library(cowplot);
 library(knitr); library(diptest); library(kableExtra)
 library(GGally);library(arm);library(broom);library(car)
-library(conflicted);library(glmnet)
+library(conflicted);library(glmnet);library(lmtest); library(sandwich)
 conflict_prefer("select", "dplyr")
 conflict_prefer("filter", "dplyr")
 conflicts_prefer(dplyr::recode)
@@ -802,8 +802,6 @@ Across grades, the index specifications (EZI and SLI) yield statistically meanin
 ```{r}
 
 #| results: hold
-library(lmtest)
-library(sandwich)
 
 
 tidy_wald <- function(mod, terms = NULL, robust = TRUE, type = "HC1") {
