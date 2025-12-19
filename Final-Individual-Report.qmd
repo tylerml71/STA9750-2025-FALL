@@ -1,5 +1,5 @@
 ---
-title: "How do lower economic indicators correlate with inspection grades given to restaurants"
+title: "Final Individual Report: Kitchen safety and the Economy"
 editor:
     mode: source
 format:
